@@ -1,11 +1,11 @@
 package PhProxy
 
 import (
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"strings"
 )
 
@@ -33,61 +33,31 @@ func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
 }
 
 func (proxy ESProxy) Create(args map[string]interface{}) (data map[string]interface{}, err error) {
-	//reqMethod := "POST"
-	//reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc?pretty",
-	//	proxy.Protocol,
-	//	proxy.Host,
-	//	proxy.Port,
-	//	args["model"],
-	//)
-	//reqBody := ioutil.NopCloser(strings.NewReader(args["cond"]))
-	//
-	//return proxy.callHttp(reqMethod, reqUrl, reqBody)
 	return
 }
 
 func (proxy ESProxy) Update(args map[string]interface{}) (data map[string]interface{}, err error) {
-	//reqMethod := "POST"
-	//reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc?pretty",
-	//	proxy.Protocol,
-	//	proxy.Host,
-	//	proxy.Port,
-	//	args["model"],
-	//)
-	//reqBody := ioutil.NopCloser(strings.NewReader(args["cond"]))
-	//
-	//return proxy.callHttp(reqMethod, reqUrl, reqBody)
 	return
 }
 
 func (proxy ESProxy) Read(args map[string]interface{}) (data map[string]interface{}, err error) {
 	reqMethod := "GET"
+	request := args["request"].(*http.Request)
+
+	model := strings.Split(request.URL.Path, "/")[1]
 	reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc/_search",
 		proxy.Protocol,
 		proxy.Host,
 		proxy.Port,
-		args["model"],
+		model,
 	)
-	var reqBody io.ReadCloser
 
-	if cond, ok := args["cond"]; ok {
-		reqBody = ioutil.NopCloser(strings.NewReader(cond.(string)))
-	}
+	resultStr, err := parse2json(request.URL.RawQuery)
 
-	return proxy.callHttp(reqMethod, reqUrl, reqBody)
+	return callHttp(reqMethod, reqUrl, strings.NewReader(resultStr))
 }
 
 func (proxy ESProxy) Delete(args map[string]interface{}) (data map[string]interface{}, err error) {
-	//reqMethod := "DELETE"
-	//reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc?pretty",
-	//	proxy.Protocol,
-	//	proxy.Host,
-	//	proxy.Port,
-	//	args["model"],
-	//)
-	//reqBody := ioutil.NopCloser(strings.NewReader(args["cond"]))
-	//
-	//return proxy.callHttp(reqMethod, reqUrl, reqBody)
 	return
 }
 
@@ -124,7 +94,7 @@ func (proxy ESProxy) Format(data map[string]interface{}) (resp interface{}, err 
 	return root, nil
 }
 
-func (proxy ESProxy) callHttp(method, url string, body io.Reader) (data map[string]interface{}, err error) {
+func callHttp(method, url string, body io.Reader) (data map[string]interface{}, err error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return
@@ -135,7 +105,6 @@ func (proxy ESProxy) callHttp(method, url string, body io.Reader) (data map[stri
 	if err != nil {
 		return
 	}
-	defer response.Body.Close()
 
 	respBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
@@ -144,4 +113,49 @@ func (proxy ESProxy) callHttp(method, url string, body io.Reader) (data map[stri
 	json.Unmarshal(respBody, &data)
 
 	return
+}
+
+func parse2json(query string) (string, error) {
+	var tmpMap = make(map[string]interface{}, 0)
+	queryArray := strings.Split(query, "&")
+
+	for _, v := range queryArray {
+		var param = strings.Split(v, "=")
+		if len(param) < 2 || param[1] == "" {
+			break
+		}
+
+		switch param[0] {
+		case "_source":
+			var tmp = make([]string, 0)
+			for _, v := range strings.Split(param[1], ",") {
+				tmp = append(tmp, v)
+			}
+			tmpMap["_source"] = tmp
+		case "sort":
+			var tmp = make([]map[string]string, 0)
+			for _, v := range strings.Split(param[1], ",") {
+				if string(v[0]) == "-" {
+					tmp = append(tmp, map[string]string{
+						v[1:]: "desc",
+					})
+				} else {
+					tmp = append(tmp, map[string]string{
+						v: "asc",
+					})
+				}
+			}
+			tmpMap["sort"] = tmp
+		default:
+		}
+	}
+
+	//jso := map[string]interface{}{
+	//	"_source": []string{"firstname", "lastname", "age"},
+	//	"sort": []map[string]string{
+	//		{"age": "asc"},
+	//	},
+	//}
+	result, err := json.Marshal(tmpMap)
+	return string(result), err
 }

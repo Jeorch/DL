@@ -2,17 +2,17 @@ package main
 
 import (
 	"log"
-	"os"
-	"time"
 	"net/http"
+	"os"
 	"os/signal"
+	"time"
 
-	"github.com/PharbersDeveloper/DL/PhProxy"
 	"github.com/PharbersDeveloper/DL/PhHandle"
+	"github.com/PharbersDeveloper/DL/PhProxy"
 )
 
-var ip = "0.0.0.0"
-var port = "9000"
+var ip = "192.168.100.157"
+var port = "9001"
 var ESHost = "192.168.100.174"
 var ESPort = "9200"
 var WriteTimeout = time.Second * 4

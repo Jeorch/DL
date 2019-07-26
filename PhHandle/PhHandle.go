@@ -1,9 +1,9 @@
 package PhHandle
 
 import (
-	"strings"
-	"net/http"
 	"encoding/json"
+	"net/http"
+	"strings"
 
 	"github.com/PharbersDeveloper/DL/PhProxy"
 )
@@ -11,19 +11,18 @@ import (
 func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqMethod := r.Method
-		reqModel := strings.Split(r.URL.Path, "/")[1]
-
 		var response []byte
 
 		switch reqMethod {
-
 		case "GET":
 			data, err := proxy.Read(map[string]interface{}{
-				"model":   reqModel,
 				"request": r,
 			})
 			if err != nil {
 				panic(err)
+			}
+			if v, ok := data["error"]; ok {
+				panic(v)
 			}
 			response, err = toBytes(data)
 
@@ -51,15 +50,25 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 }
 
 func extractTitle(r *http.Request) (title []string, err error) {
-	pathArray := strings.Split(r.URL.Path, "/")
-	if len(pathArray) > 2 && pathArray[2] == "format" {
-		for _, v := range strings.Split(r.URL.RawQuery, "&") {
+	queryArray := strings.Split(r.URL.RawQuery, "&")
+
+	var existFormat = false
+	for _, v := range queryArray {
+		if "format" == v {
+			existFormat = true
+		}
+	}
+
+	if existFormat {
+		for _, v := range queryArray {
 			tmp := strings.Split(v, "=")
 			if "_source" == tmp[0] {
 				title = strings.Split(tmp[1], ",")
+				break
 			}
 		}
 	}
+
 	return
 }
 
