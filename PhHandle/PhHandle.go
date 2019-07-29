@@ -3,6 +3,7 @@ package PhHandle
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/PharbersDeveloper/DL/PhProxy"
@@ -10,13 +11,18 @@ import (
 
 func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqMethod := r.Method
 		var response []byte
+		reqMethod := r.Method
+		model := strings.Split(r.URL.Path, "/")[1]
 
 		switch reqMethod {
 		case "GET":
+			queryObj, err := extractQueryParam(r)
+
+			// Read
 			data, err := proxy.Read(map[string]interface{}{
-				"request": r,
+				"model": model,
+				"body":  queryObj,
 			})
 			if err != nil {
 				panic(err)
@@ -24,18 +30,23 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 			if v, ok := data["error"]; ok {
 				panic(v)
 			}
-			response, err = toBytes(data)
+			response, err = json.Marshal(data)
 
-			title, err := extractTitle(r)
-			if len(title) > 0 {
-				data["title"] = title
-				format, err := proxy.Format(data)
-				if err != nil {
-					panic(err)
+			// 如果需要Format
+			if source, ok := queryObj["_source"]; ok && existFormatParam(r) {
+				var title []string
+				for _, item := range source.([]interface{}) {
+					title = append(title, item.(string))
 				}
-				response, err = toBytes(format)
-				if err != nil {
-					panic(err)
+				if len(title) > 0 {
+					formated, err := proxy.Format(map[string]interface{}{
+						"data":  data,
+						"title": title,
+					})
+					if err != nil {
+						panic(err)
+					}
+					response, err = json.Marshal(formated)
 				}
 			}
 		default:
@@ -49,29 +60,56 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 	}
 }
 
-func extractTitle(r *http.Request) (title []string, err error) {
-	queryArray := strings.Split(r.URL.RawQuery, "&")
-
+func existFormatParam(r *http.Request) bool {
+	pathArray := strings.Split(r.URL.Path, "/")
 	var existFormat = false
-	for _, v := range queryArray {
+	for _, v := range pathArray {
 		if "format" == v {
 			existFormat = true
 		}
 	}
+	return existFormat
+}
 
-	if existFormat {
-		for _, v := range queryArray {
-			tmp := strings.Split(v, "=")
-			if "_source" == tmp[0] {
-				title = strings.Split(tmp[1], ",")
-				break
-			}
-		}
+func extractQueryParam(r *http.Request) (queryObj map[string]interface{}, err error) {
+	queryObj = make(map[string]interface{})
+
+	urlQueryObj, err := extractUrlQuery(r)
+	if err != nil {
+		return
+	}
+	for k, v := range urlQueryObj {
+		queryObj[k] = v
+	}
+
+	bodyQueryObj, err := extractBodyQuery(r)
+	if err != nil || bodyQueryObj == nil {
+		return
+	}
+	for k, v := range bodyQueryObj {
+		queryObj[k] = v
 	}
 
 	return
 }
 
-func toBytes(data interface{}) (bytes []byte, err error) {
-	return json.Marshal(data)
+func extractUrlQuery(r *http.Request) (queryObj map[string]interface{}, err error) {
+	queryString, err := url.QueryUnescape(r.URL.RawQuery)
+	if err != nil {
+		return
+	}
+	if "" == queryString {
+		return
+	}
+
+	if err = json.Unmarshal([]byte(queryString), &queryObj); err != nil {
+		return
+	}
+	return
+}
+
+func extractBodyQuery(r *http.Request) (queryObj map[string]interface{}, err error) {
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&queryObj)
+	return
 }

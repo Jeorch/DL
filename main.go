@@ -12,7 +12,7 @@ import (
 )
 
 var ip = "192.168.100.157"
-var port = "9001"
+var port = "9000"
 var ESHost = "192.168.100.174"
 var ESPort = "9200"
 var WriteTimeout = time.Second * 4

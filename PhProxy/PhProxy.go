@@ -6,5 +6,5 @@ type PhProxy interface {
 	Read(args map[string]interface{}) (data map[string]interface{}, err error)
 	Delete(args map[string]interface{}) (data map[string]interface{}, err error)
 
-	Format(data map[string]interface{}) (resp interface{}, err error)
+	Format(args map[string]interface{}) (resp interface{}, err error)
 }

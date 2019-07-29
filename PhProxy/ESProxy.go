@@ -1,6 +1,7 @@
 package PhProxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,9 +43,9 @@ func (proxy ESProxy) Update(args map[string]interface{}) (data map[string]interf
 
 func (proxy ESProxy) Read(args map[string]interface{}) (data map[string]interface{}, err error) {
 	reqMethod := "GET"
-	request := args["request"].(*http.Request)
+	model := args["model"].(string)
+	body := args["body"]
 
-	model := strings.Split(request.URL.Path, "/")[1]
 	reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc/_search",
 		proxy.Protocol,
 		proxy.Host,
@@ -52,19 +53,18 @@ func (proxy ESProxy) Read(args map[string]interface{}) (data map[string]interfac
 		model,
 	)
 
-	resultStr, err := parse2json(request.URL.RawQuery)
-
-	return callHttp(reqMethod, reqUrl, strings.NewReader(resultStr))
+	return callHttp(reqMethod, reqUrl, body)
 }
 
 func (proxy ESProxy) Delete(args map[string]interface{}) (data map[string]interface{}, err error) {
 	return
 }
 
-func (proxy ESProxy) Format(data map[string]interface{}) (resp interface{}, err error) {
+func (proxy ESProxy) Format(args map[string]interface{}) (resp interface{}, err error) {
 	root := make([][]interface{}, 0)
 
-	title := data["title"].([]string)
+	title := args["title"].([]string)
+	data := args["data"].(map[string]interface{})
 	if len(title) == 0 {
 		return root, nil
 	} else {
@@ -94,8 +94,14 @@ func (proxy ESProxy) Format(data map[string]interface{}) (resp interface{}, err 
 	return root, nil
 }
 
-func callHttp(method, url string, body io.Reader) (data map[string]interface{}, err error) {
-	req, err := http.NewRequest(method, url, body)
+func callHttp(method, url string, body interface{}) (data map[string]interface{}, err error) {
+	var bodyReader io.Reader
+	if body != nil{
+		bodyBytes, _ := json.Marshal(body)
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
 		return
 	}
@@ -150,12 +156,6 @@ func parse2json(query string) (string, error) {
 		}
 	}
 
-	//jso := map[string]interface{}{
-	//	"_source": []string{"firstname", "lastname", "age"},
-	//	"sort": []map[string]string{
-	//		{"age": "asc"},
-	//	},
-	//}
 	result, err := json.Marshal(tmpMap)
 	return string(result), err
 }
