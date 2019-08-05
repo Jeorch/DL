@@ -14,13 +14,34 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhProxy
+package PhModel
 
-import . "github.com/PharbersDeveloper/DL/PhModel"
+import (
+	"github.com/PharbersDeveloper/DL/PhFactory"
+	"reflect"
+)
 
-type PhProxy interface {
-	Create(data PhModel) (err error)
-	Update(args PhModel) (data map[string]interface{}, err error)
-	Read(args PhModel) (data []map[string]interface{}, err error)
-	Delete(args PhModel) (data map[string]interface{}, err error)
+type PhModel struct {
+	Model  string
+	Query  []map[string]interface{}
+	Agg    []map[string]interface{}
+	Insert []map[string]interface{}
+	Update []map[string]interface{}
+	Format []map[string]interface{}
+}
+
+func (m PhModel) IsEmpty() bool {
+	return reflect.DeepEqual(m, PhModel{})
+}
+
+func (m PhModel) FormatResult(data interface{}) (result interface{}, err error) {
+	result = data
+	table := PhFactory.PhTable{}
+	for _, plugin := range m.Format {
+		result, err = table.GetFormat(plugin["class"].(string)).Exec(plugin["args"])(data)
+		if err != nil {
+			return
+		}
+	}
+	return
 }

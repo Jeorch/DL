@@ -14,13 +14,37 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhProxy
+package PhFactory
 
-import . "github.com/PharbersDeveloper/DL/PhModel"
+import (
+	. "github.com/smartystreets/goconvey/convey"
+	"testing"
+)
 
-type PhProxy interface {
-	Create(data PhModel) (err error)
-	Update(args PhModel) (data map[string]interface{}, err error)
-	Read(args PhModel) (data []map[string]interface{}, err error)
-	Delete(args PhModel) (data map[string]interface{}, err error)
+func TestPhTable_GetFormat(t *testing.T) {
+	name := "cut2DArray"
+	data := []interface{}{
+		map[string]interface{}{
+			"firstname": "A",
+			"lastname": "a",
+			"age": 11,
+		},
+		map[string]interface{}{
+			"firstname": "B",
+			"lastname": "b",
+			"age": 22,
+		},
+		map[string]interface{}{
+			"firstname": "C",
+			"lastname": "c",
+			"age": 33,
+		},
+	}
+
+	Convey("Test exec format by name", t, func() {
+		result, err := PhTable{}.GetFormat(name).Exec([]string{"firstname", "age"})(data)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+	})
 }

@@ -14,13 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhProxy
+package PhFormat
 
-import . "github.com/PharbersDeveloper/DL/PhModel"
-
-type PhProxy interface {
-	Create(data PhModel) (err error)
-	Update(args PhModel) (data map[string]interface{}, err error)
-	Read(args PhModel) (data []map[string]interface{}, err error)
-	Delete(args PhModel) (data map[string]interface{}, err error)
+type PhFormat interface {
+	Exec(args interface{}) func(data interface{}) (result [][]interface{}, err error)
 }

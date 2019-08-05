@@ -1,21 +1,49 @@
+/*
+ * This file is part of com.pharbers.DL.
+ *
+ * com.pharbers.DL is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * com.pharbers.DL is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package PhProxy
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
 	"encoding/json"
-	"fmt"
+	"errors"
+	. "github.com/PharbersDeveloper/DL/PhModel"
+	. "github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v7/estransport"
 	"io"
 	"io/ioutil"
+	"log"
+	"net"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 type ESProxy struct {
-	Protocol string
-	Host     string
-	Port     string
-	User     string
-	Pwd      string
+	protocol string
+	host     string
+	port     string
+	user     string
+	password string
+	esClient *Client
 }
 
 func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
@@ -24,79 +52,117 @@ func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
 		protocol = "http"
 	}
 
-	return &ESProxy{
-		Protocol: protocol,
-		Host:     args["host"],
-		Port:     args["port"],
-		User:     args["user"],
-		Pwd:      args["pwd"],
+	proxy.protocol = protocol
+	proxy.host = args["host"]
+	proxy.port = args["port"]
+	proxy.user = args["user"]
+	proxy.password = args["pwd"]
+
+	return proxy.connectES()
+}
+
+func (proxy ESProxy) connectES() *ESProxy {
+	cfg := Config{
+		Addresses: []string{
+			proxy.protocol + "://" + proxy.host + ":" + proxy.port,
+		},
+		Username: proxy.user,
+		Password: proxy.password,
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost:   10,
+			ResponseHeaderTimeout: time.Second,
+			DialContext:           (&net.Dialer{Timeout: time.Second}).DialContext,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS11,
+			},
+		},
+		Logger: &estransport.ColorLogger{
+			Output: os.Stdout,
+			EnableRequestBody:  true,
+			EnableResponseBody: true,
+		},
 	}
-}
-
-func (proxy ESProxy) Create(args map[string]interface{}) (data map[string]interface{}, err error) {
-	return
-}
-
-func (proxy ESProxy) Update(args map[string]interface{}) (data map[string]interface{}, err error) {
-	return
-}
-
-func (proxy ESProxy) Read(args map[string]interface{}) (data map[string]interface{}, err error) {
-	reqMethod := "GET"
-	model := args["model"].(string)
-	body := args["body"]
-
-	reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc/_search",
-		proxy.Protocol,
-		proxy.Host,
-		proxy.Port,
-		model,
-	)
-
-	return callHttp(reqMethod, reqUrl, body)
-}
-
-func (proxy ESProxy) Delete(args map[string]interface{}) (data map[string]interface{}, err error) {
-	return
-}
-
-func (proxy ESProxy) Format(args map[string]interface{}) (resp interface{}, err error) {
-	root := make([][]interface{}, 0)
-
-	title := args["title"].([]string)
-	data := args["data"].(map[string]interface{})
-	if len(title) == 0 {
-		return root, nil
-	} else {
-		tmp := make([]interface{}, len(title))
-		for i, v := range title {
-			tmp[i] = v
-		}
-		root = append(root, tmp)
+	es, err := NewClient(cfg)
+	if err != nil {
+		log.Fatalf("Error creating the client: %s", err)
 	}
 
-	if v, ok := data["hits"]; ok {
-		if hits, ok := v.(map[string]interface{})["hits"]; ok {
-			items := hits.([]interface{})
-			for _, item := range items {
-				arr := make([]interface{}, 0)
-				if source, ok := item.(map[string]interface{})["_source"]; ok {
-					obj := source.(map[string]interface{})
-					for _, k := range title {
-						arr = append(arr, obj[k])
-					}
-				}
-				root = append(root, arr)
+	proxy.esClient = es
+	return &proxy
+}
+
+func (proxy ESProxy) Create(args PhModel) (err error) {
+	model := args.Model
+	data := args.Insert
+	if model == "" {
+		return errors.New("未指定插入的索引")
+	}
+	if data == nil {
+		return errors.New("插入的数据为空")
+	}
+
+	var wg sync.WaitGroup
+	for i, title := range data {
+		wg.Add(1)
+
+		// 启动协程并发写入
+		go func(i int, row map[string]interface{}) {
+			defer wg.Done()
+
+			jsonBytes, err := json.Marshal(row)
+			// Set up the request object.
+			req := esapi.IndexRequest{
+				Index: model,
+				//DocumentID: strconv.Itoa(i + 1), // 自动生成id
+				Body:    strings.NewReader(string(jsonBytes)),
+				Refresh: "true",
 			}
-		}
-	}
 
-	return root, nil
+			// Perform the request with the client.
+			res, err := req.Do(context.Background(), proxy.esClient)
+			if err != nil {
+				log.Fatalf("Error getting response: %s", err)
+			}
+			defer res.Body.Close()
+
+			if res.IsError() {
+				log.Printf("[%s] Error indexing document, obj = %s", res.Status(), string(jsonBytes))
+			}
+		}(i, title)
+	}
+	wg.Wait()
+
+	return
+}
+
+func (proxy ESProxy) Update(args PhModel) (data map[string]interface{}, err error) {
+	return
+}
+
+func (proxy ESProxy) Read(args PhModel) (data []map[string]interface{}, err error) {
+	//proxy.esClient.
+	//reqMethod := "GET"
+	//body := args
+	//
+	//reqUrl := fmt.Sprintf("%s://%s:%s/%s/_doc/_search",
+	//	proxy.Protocol,
+	//	proxy.Host,
+	//	proxy.Port,
+	//	args.Model,
+	//)
+
+	//result, err := callHttp(reqMethod, reqUrl, body)
+	//data, err = format(result)
+	return
+}
+
+func (proxy ESProxy) Delete(args PhModel) (data map[string]interface{}, err error) {
+	return
 }
 
 func callHttp(method, url string, body interface{}) (data map[string]interface{}, err error) {
 	var bodyReader io.Reader
-	if body != nil{
+	if body != nil {
 		bodyBytes, _ := json.Marshal(body)
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
@@ -119,43 +185,4 @@ func callHttp(method, url string, body interface{}) (data map[string]interface{}
 	json.Unmarshal(respBody, &data)
 
 	return
-}
-
-func parse2json(query string) (string, error) {
-	var tmpMap = make(map[string]interface{}, 0)
-	queryArray := strings.Split(query, "&")
-
-	for _, v := range queryArray {
-		var param = strings.Split(v, "=")
-		if len(param) < 2 || param[1] == "" {
-			break
-		}
-
-		switch param[0] {
-		case "_source":
-			var tmp = make([]string, 0)
-			for _, v := range strings.Split(param[1], ",") {
-				tmp = append(tmp, v)
-			}
-			tmpMap["_source"] = tmp
-		case "sort":
-			var tmp = make([]map[string]string, 0)
-			for _, v := range strings.Split(param[1], ",") {
-				if string(v[0]) == "-" {
-					tmp = append(tmp, map[string]string{
-						v[1:]: "desc",
-					})
-				} else {
-					tmp = append(tmp, map[string]string{
-						v: "asc",
-					})
-				}
-			}
-			tmpMap["sort"] = tmp
-		default:
-		}
-	}
-
-	result, err := json.Marshal(tmpMap)
-	return string(result), err
 }

@@ -1,31 +1,48 @@
+/*
+ * This file is part of com.pharbers.DL.
+ *
+ * com.pharbers.DL is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * com.pharbers.DL is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package main
 
 import (
+	"github.com/PharbersDeveloper/DL/PhHandle"
+	"github.com/PharbersDeveloper/DL/PhProxy"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
-
-	"github.com/PharbersDeveloper/DL/PhHandle"
-	"github.com/PharbersDeveloper/DL/PhProxy"
 )
 
-var ip = "127.0.0.1"
-var port = "9000"
-var ESHost = "127.0.0.1"
-var ESPort = "9200"
+var ip = "192.168.100.157"
+var port = "9001"
 var WriteTimeout = time.Second * 4
+var ESHost = "192.168.100.157"
+var ESPort = "9200"
 
 func main() {
+	addr := ip + ":" + port
 	proxy := PhProxy.ESProxy{}.NewProxy(map[string]string{
 		"host": ESHost,
 		"port": ESPort,
 	})
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", PhHandle.PhHandle(proxy))
+	mux.HandleFunc("/v1.0/DL", PhHandle.PhHandle(proxy))
 
+	/// 下面不用管，网上抄的
 	// 主动关闭服务器
 	var server *http.Server
 
@@ -34,12 +51,12 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 
 	server = &http.Server{
-		Addr:         ip + ":" + port,
+		Addr:         addr,
 		WriteTimeout: WriteTimeout,
 		Handler:      mux,
 	}
 
-	log.Println("Starting httpserver")
+	log.Println("Starting httpserver in " + port)
 
 	go func() {
 		// 接收退出信号

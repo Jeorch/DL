@@ -14,13 +14,39 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhProxy
+package PhHandle
 
-import . "github.com/PharbersDeveloper/DL/PhModel"
+import (
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+)
 
-type PhProxy interface {
-	Create(data PhModel) (err error)
-	Update(args PhModel) (data map[string]interface{}, err error)
-	Read(args PhModel) (data []map[string]interface{}, err error)
-	Delete(args PhModel) (data map[string]interface{}, err error)
+func extractUrlQuery(r *http.Request, queryObj interface{}) (err error) {
+	queryString, err := url.QueryUnescape(r.URL.RawQuery)
+	if err != nil {
+		return
+	}
+	if "" == queryString {
+		return
+	}
+
+	if err = json.Unmarshal([]byte(queryString), &queryObj); err != nil {
+		return
+	}
+	return
+}
+
+func extractBodyQuery(r *http.Request, queryObj interface{}) (err error) {
+	body, err := ioutil.ReadAll(r.Body)
+	err = json.Unmarshal(body, &queryObj)
+	return
+}
+
+func extractModel(r *http.Request, model interface{}) (err error) {
+	err = extractBodyQuery(r, &model)
+	err = extractUrlQuery(r, &model)
+
+	return
 }

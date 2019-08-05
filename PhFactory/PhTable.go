@@ -14,13 +14,16 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhProxy
+package PhFactory
 
-import . "github.com/PharbersDeveloper/DL/PhModel"
+import "github.com/PharbersDeveloper/DL/PhFormat"
 
-type PhProxy interface {
-	Create(data PhModel) (err error)
-	Update(args PhModel) (data map[string]interface{}, err error)
-	Read(args PhModel) (data []map[string]interface{}, err error)
-	Delete(args PhModel) (data map[string]interface{}, err error)
+var phFormatFactory = map[string]PhFormat.PhFormat{
+	"cut2DArray": PhFormat.Cut2DArrayFormat{},
+}
+
+type PhTable struct{}
+
+func (t PhTable) GetFormat(name string) PhFormat.PhFormat {
+	return phFormatFactory[name]
 }
