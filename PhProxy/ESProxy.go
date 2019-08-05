@@ -70,7 +70,7 @@ func (proxy ESProxy) connectES() *ESProxy {
 		Password: proxy.password,
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost:   10,
-			ResponseHeaderTimeout: time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
 			DialContext:           (&net.Dialer{Timeout: time.Second}).DialContext,
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS11,

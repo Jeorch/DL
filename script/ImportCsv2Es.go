@@ -23,6 +23,7 @@ import (
 	. "github.com/recursionpharma/go-csv-map"
 	"io/ioutil"
 	"log"
+	"strconv"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 		records[i]["date"] = date
 		mapInterface := make(map[string]interface{})
 		for k, v := range records[i] {
-			mapInterface[k] = v
+			mapInterface[k] = convertString(v)
 		}
 		sliceMapInterface = append(sliceMapInterface, mapInterface)
 	}
@@ -61,6 +62,25 @@ func main() {
 	}
 
 	log.Println("导入完成")
+}
+
+func convertString(str string) interface{} {
+	if i, err := strconv.Atoi(str); err == nil {
+		return i
+	}
+	if l, err := strconv.ParseInt(str, 10, 64); err == nil {
+		return l
+	}
+	if b, err := strconv.ParseBool(str); err == nil {
+		return b
+	}
+	if f, err := strconv.ParseFloat(str, 32); err == nil {
+		return f
+	}
+	if d, err := strconv.ParseFloat(str, 64); err == nil {
+		return d
+	}
+	return str
 }
 
 func InsertES(data []map[string]interface{}) error {
