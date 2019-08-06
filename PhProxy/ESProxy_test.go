@@ -17,21 +17,20 @@
 package PhProxy
 
 import (
-	"fmt"
-	. "github.com/PharbersDeveloper/DL/PhModel"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
-var tESHost = "192.168.100.157"
-var tESPort = "9200"
+const (
+	tESHost = "127.0.0.1"
+	tESPort = "9200"
+)
 
 func TestESProxy_NewProxy(t *testing.T) {
 	proxy := ESProxy{}.NewProxy(map[string]string{
 		"host": tESHost,
 		"port": tESPort,
 	})
-
 	esClient := proxy.esClient
 
 	Convey("Test create ES Proxy", t, func() {
@@ -46,41 +45,45 @@ func TestESProxy_Create(t *testing.T) {
 		"port": tESPort,
 	})
 
-	model := PhModel {
-		Model: "test",
-		Insert: []map[string]interface{}{
-			{
-				"firstname": "A",
-				"lastname":  "a",
-				"age":       11,
-			},
-			{
-				"firstname": "B",
-				"lastname":  "b",
-				"age":       22,
-			},
-			{
-				"firstname": "C",
-				"lastname":  "c",
-				"age":       33,
-			},
+	table := "test"
+	insert := []map[string]interface{}{
+		{
+			"firstname": "A",
+			"lastname":  "a",
+			"age":       11,
+		},
+		{
+			"firstname": "B",
+			"lastname":  "b",
+			"age":       22,
+		},
+		{
+			"firstname": "C",
+			"lastname":  "c",
+			"age":       33,
 		},
 	}
 
 	Convey("Test ES search all index", t, func() {
-		err := proxy.Create(model)
+		result, err := proxy.Create(table, insert)
 
+		So(result, ShouldNotBeEmpty)
 		So(err, ShouldBeNil)
 	})
 }
 
-func TestESProxy_Read(t *testing.T) {
-	proxy := ESProxy{}.NewProxy(map[string]string{
-		"host": tESHost,
-		"port": tESPort,
-	})
+func TestESProxy_Update(t *testing.T) {
 
-	fmt.Println(proxy.port)
+}
+
+func TestESProxy_Read(t *testing.T) {
+	//proxy := ESProxy{}.NewProxy(map[string]string{
+	//	"host": tESHost,
+	//	"port": tESPort,
+	//})
+
+	//proxy.esClient.Create
+	//fmt.Println(proxy.port)
 
 	//model := PhModel {
 	//	Model: "test",
@@ -99,4 +102,28 @@ func TestESProxy_Read(t *testing.T) {
 	//	So(err, ShouldBeNil)
 	//	So(result, ShouldNotBeNil)
 	//})
+}
+
+func TestESProxy_Delete(t *testing.T) {
+	proxy := ESProxy{}.NewProxy(map[string]string{
+		"host": tESHost,
+		"port": tESPort,
+	})
+
+	table := "test"
+	//data := []map[string]interface{}{
+	//	{
+	//		"_id": "tDOeZmwBfr7U6nQ6NGXT",
+	//	},
+	//	{
+	//		"_id": "oTOIZmwBfr7U6nQ6J2Xi",
+	//	},
+	//}
+
+	Convey("Test ES delete by id", t, func() {
+		result, err := proxy.Delete(table, []map[string]interface{}{})
+
+		So(result, ShouldNotBeEmpty)
+		So(err, ShouldBeNil)
+	})
 }

@@ -42,7 +42,6 @@ func TestPhModel_FormatResult(t *testing.T) {
 
 	Convey("Test null format exec", t, func() {
 		model := PhModel {
-			Model: "test",
 			Format: nil,
 		}
 
@@ -54,7 +53,6 @@ func TestPhModel_FormatResult(t *testing.T) {
 
 	Convey("Test simple format exec", t, func() {
 		model := PhModel {
-			Model: "test",
 			Format:[]map[string]interface{}{
 				{
 					"class": "cut2DArray",

@@ -18,7 +18,6 @@ package main
 
 import (
 	"bytes"
-	. "github.com/PharbersDeveloper/DL/PhModel"
 	. "github.com/PharbersDeveloper/DL/PhProxy"
 	. "github.com/recursionpharma/go-csv-map"
 	"io/ioutil"
@@ -26,9 +25,14 @@ import (
 	"strconv"
 )
 
-func main() {
-	var date = "2018Q1"
+const (
+	date        = "2018Q1"
+	tESHost     = "192.168.100.157"
+	tESPort     = "9200"
+	importIndex = "oldtm"
+)
 
+func main() {
 	fileName := "/Users/clock/Downloads/TMResult.csv"
 	dataBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -56,8 +60,8 @@ func main() {
 		sliceMapInterface = append(sliceMapInterface, mapInterface)
 	}
 
-	err = InsertES(sliceMapInterface)
-	if err != nil {
+	r, err := InsertES(sliceMapInterface)
+	if err != nil || r == nil {
 		panic(err.Error())
 	}
 
@@ -83,20 +87,11 @@ func convertString(str string) interface{} {
 	return str
 }
 
-func InsertES(data []map[string]interface{}) error {
-	var tESHost = "192.168.100.157"
-	var tESPort = "9200"
-	var importIndex = "oldtm"
-
+func InsertES(data []map[string]interface{}) (interface{}, error) {
 	proxy := ESProxy{}.NewProxy(map[string]string{
 		"host": tESHost,
 		"port": tESPort,
 	})
 
-	model := PhModel {
-		Model: importIndex,
-		Insert: data,
-	}
-
-	return proxy.Create(model)
+	return proxy.Create(importIndex, data)
 }

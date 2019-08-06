@@ -17,24 +17,11 @@
 package PhProxy
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/json"
 	"errors"
-	. "github.com/PharbersDeveloper/DL/PhModel"
-	. "github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/elastic/go-elasticsearch/v7/estransport"
-	"io"
-	"io/ioutil"
+	"github.com/olivere/elastic/v7"
 	"log"
-	"net"
-	"net/http"
 	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 type ESProxy struct {
@@ -43,7 +30,7 @@ type ESProxy struct {
 	port     string
 	user     string
 	password string
-	esClient *Client
+	esClient *elastic.Client
 }
 
 func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
@@ -62,84 +49,69 @@ func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
 }
 
 func (proxy ESProxy) connectES() *ESProxy {
-	cfg := Config{
-		Addresses: []string{
-			proxy.protocol + "://" + proxy.host + ":" + proxy.port,
-		},
-		Username: proxy.user,
-		Password: proxy.password,
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost:   10,
-			ResponseHeaderTimeout: 10 * time.Second,
-			DialContext:           (&net.Dialer{Timeout: time.Second}).DialContext,
-			TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS11,
-			},
-		},
-		Logger: &estransport.ColorLogger{
-			Output: os.Stdout,
-			EnableRequestBody:  true,
-			EnableResponseBody: true,
-		},
-	}
-	es, err := NewClient(cfg)
+	var host = proxy.protocol + "://" + proxy.host + ":" + proxy.port
+
+	errorlog := log.New(os.Stdout, "ES: ", log.LstdFlags)
+	client, err := elastic.NewClient(elastic.SetSniff(false), elastic.SetErrorLog(errorlog), elastic.SetURL("http://localhost:9200"))
 	if err != nil {
-		log.Fatalf("Error creating the client: %s", err)
+		panic(err)
 	}
 
-	proxy.esClient = es
+	info, code, err := client.Ping(host).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
+
+	esversion, err := client.ElasticsearchVersion(host)
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Elasticsearch version %s\n", esversion)
+
+	proxy.esClient = client
 	return &proxy
 }
 
-func (proxy ESProxy) Create(args PhModel) (err error) {
-	model := args.Model
-	data := args.Insert
-	if model == "" {
-		return errors.New("未指定插入的索引")
+func (proxy ESProxy) Create(table string, insert []map[string]interface{}) (result []map[string]interface{}, err error) {
+	bulkRequest := proxy.esClient.Bulk()
+	for _, item := range insert {
+		req := elastic.NewBulkIndexRequest().Index(table).Doc(item)
+		bulkRequest.Add(req)
 	}
-	if data == nil {
-		return errors.New("插入的数据为空")
+	bulkResponse, err := bulkRequest.Do(context.Background())
+
+	if err != nil {
+		log.Printf("ES插入错误" + err.Error())
+		return nil, err
+	}
+	if bulkResponse.Errors {
+		log.Println("ES插入错误")
+		return nil, errors.New("ES插入错误")
 	}
 
-	var wg sync.WaitGroup
-	for i, title := range data {
-		wg.Add(1)
-
-		// 启动协程并发写入
-		go func(i int, row map[string]interface{}) {
-			defer wg.Done()
-
-			jsonBytes, err := json.Marshal(row)
-			// Set up the request object.
-			req := esapi.IndexRequest{
-				Index: model,
-				//DocumentID: strconv.Itoa(i + 1), // 自动生成id
-				Body:    strings.NewReader(string(jsonBytes)),
-				Refresh: "true",
-			}
-
-			// Perform the request with the client.
-			res, err := req.Do(context.Background(), proxy.esClient)
-			if err != nil {
-				log.Fatalf("Error getting response: %s", err)
-			}
-			defer res.Body.Close()
-
-			if res.IsError() {
-				log.Printf("[%s] Error indexing document, obj = %s", res.Status(), string(jsonBytes))
-			}
-		}(i, title)
+	for i, item := range bulkResponse.Items {
+		tmp := insert[i]
+		tmp["_id"] = item["index"].Id
+		result = append(result, tmp)
 	}
-	wg.Wait()
-
 	return
 }
 
-func (proxy ESProxy) Update(args PhModel) (data map[string]interface{}, err error) {
+// TODO proxy.esClient.UpdateByQuery() 未实现
+func (proxy ESProxy) Update(table string, update []map[string]interface{}) (result []map[string]interface{}, err error) {
 	return
 }
 
-func (proxy ESProxy) Read(args PhModel) (data []map[string]interface{}, err error) {
+func (proxy ESProxy) Read(table string, query []map[string]interface{}) (result []map[string]interface{}, err error) {
+	//table := args.Model
+	//if table == "" {
+	//	err = errors.New("未指定查询的索引")
+	//	return
+	//}
+	//
+	//proxy.esClient.SQL
+
 	//proxy.esClient.
 	//reqMethod := "GET"
 	//body := args
@@ -156,33 +128,16 @@ func (proxy ESProxy) Read(args PhModel) (data []map[string]interface{}, err erro
 	return
 }
 
-func (proxy ESProxy) Delete(args PhModel) (data map[string]interface{}, err error) {
-	return
-}
-
-func callHttp(method, url string, body interface{}) (data map[string]interface{}, err error) {
-	var bodyReader io.Reader
-	if body != nil {
-		bodyBytes, _ := json.Marshal(body)
-		bodyReader = bytes.NewReader(bodyBytes)
+// TODO proxy.esClient.DeleteByQuery() 未实现
+func (proxy ESProxy) Delete(table string, query []map[string]interface{}) (result []map[string]interface{}, err error) {
+	result = query
+	for _, item := range query {
+		_, err := proxy.esClient.Delete().Index(table).
+			Id(item["_id"].(string)).
+			Do(context.Background())
+		if err != nil {
+			return result, err
+		}
 	}
-
-	req, err := http.NewRequest(method, url, bodyReader)
-	if err != nil {
-		return
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-
-	respBody, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return
-	}
-	json.Unmarshal(respBody, &data)
-
 	return
 }
