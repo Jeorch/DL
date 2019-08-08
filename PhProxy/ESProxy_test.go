@@ -24,6 +24,7 @@ import (
 const (
 	tESHost = "127.0.0.1"
 	tESPort = "9200"
+	table   = "es-test"
 )
 
 func TestESProxy_NewProxy(t *testing.T) {
@@ -45,26 +46,40 @@ func TestESProxy_Create(t *testing.T) {
 		"port": tESPort,
 	})
 
-	table := "test"
 	insert := []map[string]interface{}{
 		{
-			"firstname": "A",
-			"lastname":  "a",
+			"firstname": "张",
+			"lastname":  "三",
 			"age":       11,
 		},
 		{
-			"firstname": "B",
-			"lastname":  "b",
+			"firstname": "李",
+			"lastname":  "四",
 			"age":       22,
 		},
 		{
-			"firstname": "C",
-			"lastname":  "c",
+			"firstname": "王",
+			"lastname":  "五",
 			"age":       33,
+		},
+		{
+			"firstname": "张",
+			"lastname":  "全蛋",
+			"age":       111,
+		},
+		{
+			"firstname": "张",
+			"lastname":  "少蛋",
+			"age":       222,
+		},
+		{
+			"firstname": "张",
+			"lastname":  "蛋大",
+			"age":       333,
 		},
 	}
 
-	Convey("Test ES search all index", t, func() {
+	Convey("Test ES insert multi data", t, func() {
 		result, err := proxy.Create(table, insert)
 
 		So(result, ShouldNotBeEmpty)
@@ -73,57 +88,144 @@ func TestESProxy_Create(t *testing.T) {
 }
 
 func TestESProxy_Update(t *testing.T) {
-
+	t.SkipNow()
 }
 
 func TestESProxy_Read(t *testing.T) {
-	//proxy := ESProxy{}.NewProxy(map[string]string{
-	//	"host": tESHost,
-	//	"port": tESPort,
-	//})
-
-	//proxy.esClient.Create
-	//fmt.Println(proxy.port)
-
-	//model := PhModel {
-	//	Model: "test",
-	//	Format:[]map[string]interface{}{
-	//		{
-	//			"class": "cut2DArray",
-	//			"args":  []string{"firstname", "age"},
-	//		},
-	//	},
-	//}
-	//
-	//Convey("Test ES search all index", t, func() {
-	//	result, err := es.Read(model)
-	//	fmt.Println(result)
-	//
-	//	So(err, ShouldBeNil)
-	//	So(result, ShouldNotBeNil)
-	//})
-}
-
-func TestESProxy_Delete(t *testing.T) {
 	proxy := ESProxy{}.NewProxy(map[string]string{
 		"host": tESHost,
 		"port": tESPort,
 	})
 
-	table := "test"
-	//data := []map[string]interface{}{
-	//	{
-	//		"_id": "tDOeZmwBfr7U6nQ6NGXT",
-	//	},
-	//	{
-	//		"_id": "oTOIZmwBfr7U6nQ6J2Xi",
-	//	},
-	//}
+	Convey("查询全部文档", t, func() {
+		query := map[string]interface{}{
+			"search": nil,
+		}
+		result, err := proxy.Read([]string{table}, query)
 
-	Convey("Test ES delete by id", t, func() {
-		result, err := proxy.Delete(table, []map[string]interface{}{})
-
-		So(result, ShouldNotBeEmpty)
 		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 6)
 	})
+
+	Convey("查询全部文档并递减排序", t, func() {
+		query := map[string]interface{}{
+			"search": map[string]interface{}{
+				"sort" : []string{"-age"},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 6)
+		So(result[0]["age"], ShouldBeGreaterThan, result[1]["age"])
+	})
+
+	Convey("简单条件查询", t, func() {
+		query := map[string]interface{}{
+			"search": map[string]interface{}{
+				"sort" : []string{"-age"},
+				"and": [][]interface{}{
+					{"eq", "firstname.keyword", "张"},
+					{"lte", "age", 300},
+					{"gte", "age", 100},
+				},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 2)
+		So(result[0]["age"], ShouldBeGreaterThan, result[1]["age"])
+		So(result[0]["firstname"], ShouldEqual, "张")
+		So(result[1]["firstname"], ShouldEqual, "张")
+	})
+
+	Convey("嵌套查询", t, func() {
+		query := map[string]interface{}{
+			"search": map[string]interface{}{
+				"sort": []string{"-age"},
+				"or": [][]interface{}{
+					{"and", [][]interface{}{
+						{"eq", "firstname.keyword", "张"},
+						{"lte", "age", 300},
+						{"gte", "age", 100},
+					}},
+					{"eq", "firstname.keyword", "李"},
+				},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 3)
+		So(result[0]["age"], ShouldBeGreaterThan, result[1]["age"])
+		So(result[0]["firstname"], ShouldEqual, "张")
+		So(result[1]["firstname"], ShouldEqual, "张")
+		So(result[2]["firstname"], ShouldEqual, "李")
+	})
+
+	Convey("桶聚合", t, func() {
+		query := map[string]interface{}{
+			"aggs": []map[string]interface{}{
+				{
+					"groupBy": "firstname.keyword",
+					"aggs": []map[string]interface{}{
+						{
+							"groupBy": "lastname.keyword",
+							"aggs": []map[string]interface{}{
+								{"agg": "sum", "field": "age"},
+								{"agg": "avg", "field": "age"},
+							},
+						},
+						{"agg": "sum", "field": "age"},
+						{"agg": "avg", "field": "age"},
+					},
+				},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 9)
+	})
+
+	Convey("查询并桶聚合", t, func() {
+		query := map[string]interface{}{
+			"search": map[string]interface{}{
+				"and": [][]interface{}{
+					{"lte", "age", 300},
+				},
+			},
+			"aggs": []map[string]interface{}{
+				{
+					"groupBy": "firstname.keyword",
+					"aggs": []map[string]interface{}{
+						{
+							"groupBy": "lastname.keyword",
+							"aggs": []map[string]interface{}{
+								{"agg": "sum", "field": "age"},
+								{"agg": "avg", "field": "age"},
+							},
+						},
+						{"agg": "sum", "field": "age"},
+						{"agg": "avg", "field": "age"},
+					},
+				},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 8)
+	})
+}
+
+func TestESProxy_Delete(t *testing.T) {
+	t.SkipNow()
 }

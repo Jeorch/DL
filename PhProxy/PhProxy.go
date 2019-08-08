@@ -19,6 +19,6 @@ package PhProxy
 type PhProxy interface {
 	Create(table string, insert []map[string]interface{}) (result []map[string]interface{}, err error)
 	Update(table string, update []map[string]interface{}) (result []map[string]interface{}, err error)
-	Read(table string, query []map[string]interface{}) (result []map[string]interface{}, err error)
+	Read(table []string, query map[string]interface{}) (result []map[string]interface{}, err error)
 	Delete(table string, query []map[string]interface{}) (result []map[string]interface{}, err error)
 }

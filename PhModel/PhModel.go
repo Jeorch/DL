@@ -23,8 +23,7 @@ import (
 
 type PhModel struct {
 	Model  string
-	Query  []map[string]interface{}
-	Agg    []map[string]interface{}
+	Query  map[string]interface{}
 	Insert []map[string]interface{}
 	Update []map[string]interface{}
 	Format []map[string]interface{}

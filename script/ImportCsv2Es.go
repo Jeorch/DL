@@ -29,7 +29,7 @@ const (
 	date        = "2018Q1"
 	tESHost     = "192.168.100.157"
 	tESPort     = "9200"
-	importIndex = "oldtm"
+	importIndex = "oldtm2"
 )
 
 func main() {
