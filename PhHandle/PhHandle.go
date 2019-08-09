@@ -24,7 +24,8 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 			case "POST":
 				response = []byte("Not Supported")
 			case "GET":
-				if readResult, err := proxy.Read(model); err != nil {
+				tables := strings.Split(model.Model, ",")
+				if readResult, err := proxy.Read(tables, model.Query); err != nil {
 					response = []byte("Query Error")
 				} else {
 					if formatResult, err := model.FormatResult(readResult); err != nil {

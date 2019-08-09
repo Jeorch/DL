@@ -166,15 +166,16 @@ func (util esCondUtil) genBaseQuery(oper []interface{}) elastic.Query {
 	return query
 }
 
-func (util esCondUtil) genBoolQuery(oper string, subOpers [][]interface{}) elastic.Query {
+func (util esCondUtil) genBoolQuery(oper string, subOpers interface{}) elastic.Query {
 	// 先解析包裹的子查询
 	queries := make([]elastic.Query, 0)
-	for _, oper := range subOpers {
+	for _, oper := range subOpers.([]interface{}) {
+		oper := oper.([]interface{})
 		switch oper[0].(string) {
 		case "or":
-			queries = append(queries, util.genBoolQuery("or", oper[1].([][]interface{})))
+			queries = append(queries, util.genBoolQuery("or", oper[1]))
 		case "and":
-			queries = append(queries, util.genBoolQuery("and", oper[1].([][]interface{})))
+			queries = append(queries, util.genBoolQuery("and", oper[1]))
 		default:
 			queries = append(queries, util.genBaseQuery(oper))
 		}
@@ -202,15 +203,15 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 	for k, v := range search.(map[string]interface{}) {
 		switch k {
 		case "sort":
-			for _, str := range v.([]string) {
-				if strings.HasPrefix(str, "-") {
-					util.ser.Sort(str[1:], false)
+			for _, str := range v.([]interface{}) {
+				if strings.HasPrefix(str.(string), "-") {
+					util.ser.Sort(str.(string)[1:], false)
 				} else {
-					util.ser.Sort(str, true)
+					util.ser.Sort(str.(string), true)
 				}
 			}
 		case "and", "or":
-			util.ser.Query(util.genBoolQuery(k, v.([][]interface{})))
+			util.ser.Query(util.genBoolQuery(k, v))
 		}
 	}
 
@@ -232,7 +233,7 @@ func (util esCondUtil) genBaseAgg(oper, field string) elastic.Aggregation {
 
 func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) elastic.Aggregation {
 	key := aggregation["groupBy"].(string)
-	aggs := aggregation["aggs"].([]map[string]interface{})
+	aggs := aggregation["aggs"].([]interface{})
 
 	terms := elastic.NewTermsAggregation()
 	if strings.HasPrefix(key, "-") {
@@ -242,6 +243,7 @@ func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) elastic.Agg
 	}
 
 	for _, agg := range aggs {
+		agg := agg.(map[string]interface{})
 		if oper, ok := agg["agg"]; ok {
 			oper := oper.(string)
 			field := agg["field"].(string)
@@ -261,9 +263,9 @@ func (util esCondUtil) genAggCond(aggs interface{}) esCondUtil {
 		return util
 	}
 
-	for _, item := range aggs.([]map[string]interface{}) {
-		key := item["groupBy"].(string)
-		util.ser.Aggregation(key, util.genRecAgg(item))
+	for _, item := range aggs.([]interface{}) {
+		key := item.(map[string]interface{})["groupBy"].(string)
+		util.ser.Aggregation(key, util.genRecAgg(item.(map[string]interface{})))
 	}
 
 	return util

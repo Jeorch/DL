@@ -22,18 +22,18 @@ import (
 )
 
 func TestCut2DArrayFormat_Exec(t *testing.T) {
-	data := []interface{}{
-		map[string]interface{}{
+	data := []map[string]interface{}{
+		{
 			"firstname": "A",
 			"lastname": "a",
 			"age": 11,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "B",
 			"lastname": "b",
 			"age": 22,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "C",
 			"lastname": "c",
 			"age": 33,
@@ -41,14 +41,14 @@ func TestCut2DArrayFormat_Exec(t *testing.T) {
 	}
 
 	Convey("Test format data to 2DArray in nil args", t, func() {
-		result, err := Cut2DArrayFormat{}.Exec([]string{})(data)
+		result, err := Cut2DArrayFormat{}.Exec([]interface{}{})(data)
 
 		So(err, ShouldNotBeNil)
 		So(result, ShouldBeNil)
 	})
 
 	Convey("Test format data to 2DArray", t, func() {
-		keepTitle := []string{"firstname", "age"}
+		keepTitle := []interface{}{"firstname", "age"}
 		result, err := Cut2DArrayFormat{}.Exec(keepTitle)(data)
 
 		So(err, ShouldBeNil)

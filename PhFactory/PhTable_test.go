@@ -23,18 +23,18 @@ import (
 
 func TestPhTable_GetFormat(t *testing.T) {
 	name := "cut2DArray"
-	data := []interface{}{
-		map[string]interface{}{
+	data := []map[string]interface{}{
+		{
 			"firstname": "A",
 			"lastname": "a",
 			"age": 11,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "B",
 			"lastname": "b",
 			"age": 22,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "C",
 			"lastname": "c",
 			"age": 33,
@@ -42,7 +42,7 @@ func TestPhTable_GetFormat(t *testing.T) {
 	}
 
 	Convey("Test exec format by name", t, func() {
-		result, err := PhTable{}.GetFormat(name).Exec([]string{"firstname", "age"})(data)
+		result, err := PhTable{}.GetFormat(name).Exec([]interface{}{"firstname", "age"})(data)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)

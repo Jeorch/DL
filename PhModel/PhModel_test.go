@@ -22,18 +22,18 @@ import (
 )
 
 func TestPhModel_FormatResult(t *testing.T) {
-	data := []interface{}{
-		map[string]interface{}{
+	data := []map[string]interface{}{
+		{
 			"firstname": "A",
 			"lastname": "a",
 			"age": 11,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "B",
 			"lastname": "b",
 			"age": 22,
 		},
-		map[string]interface{}{
+		{
 			"firstname": "C",
 			"lastname": "c",
 			"age": 33,
@@ -56,7 +56,7 @@ func TestPhModel_FormatResult(t *testing.T) {
 			Format:[]map[string]interface{}{
 				{
 					"class": "cut2DArray",
-					"args":  []string{"firstname", "age"},
+					"args":  []interface{}{"firstname", "age"},
 				},
 			},
 		}

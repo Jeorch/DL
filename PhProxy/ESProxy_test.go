@@ -98,6 +98,7 @@ func TestESProxy_Read(t *testing.T) {
 	})
 
 	Convey("查询全部文档", t, func() {
+
 		query := map[string]interface{}{
 			"search": nil,
 		}
@@ -111,7 +112,7 @@ func TestESProxy_Read(t *testing.T) {
 	Convey("查询全部文档并递减排序", t, func() {
 		query := map[string]interface{}{
 			"search": map[string]interface{}{
-				"sort" : []string{"-age"},
+				"sort" : []interface{}{"-age"},
 			},
 		}
 		result, err := proxy.Read([]string{table}, query)
@@ -125,11 +126,11 @@ func TestESProxy_Read(t *testing.T) {
 	Convey("简单条件查询", t, func() {
 		query := map[string]interface{}{
 			"search": map[string]interface{}{
-				"sort" : []string{"-age"},
-				"and": [][]interface{}{
-					{"eq", "firstname.keyword", "张"},
-					{"lte", "age", 300},
-					{"gte", "age", 100},
+				"sort" : []interface{}{"-age"},
+				"and": []interface{}{
+					[]interface{}{"eq", "firstname.keyword", "张"},
+					[]interface{}{"lte", "age", 300},
+					[]interface{}{"gte", "age", 100},
 				},
 			},
 		}
@@ -146,14 +147,14 @@ func TestESProxy_Read(t *testing.T) {
 	Convey("嵌套查询", t, func() {
 		query := map[string]interface{}{
 			"search": map[string]interface{}{
-				"sort": []string{"-age"},
-				"or": [][]interface{}{
-					{"and", [][]interface{}{
-						{"eq", "firstname.keyword", "张"},
-						{"lte", "age", 300},
-						{"gte", "age", 100},
+				"sort": []interface{}{"-age"},
+				"or": []interface{}{
+					[]interface{}{"and", []interface{}{
+						[]interface{}{"eq", "firstname.keyword", "张"},
+						[]interface{}{"lte", "age", 300},
+						[]interface{}{"gte", "age", 100},
 					}},
-					{"eq", "firstname.keyword", "李"},
+					[]interface{}{"eq", "firstname.keyword", "李"},
 				},
 			},
 		}
@@ -170,19 +171,19 @@ func TestESProxy_Read(t *testing.T) {
 
 	Convey("桶聚合", t, func() {
 		query := map[string]interface{}{
-			"aggs": []map[string]interface{}{
-				{
+			"aggs": []interface{}{
+				map[string]interface{}{
 					"groupBy": "firstname.keyword",
-					"aggs": []map[string]interface{}{
-						{
+					"aggs": []interface{}{
+						map[string]interface{}{
 							"groupBy": "lastname.keyword",
-							"aggs": []map[string]interface{}{
-								{"agg": "sum", "field": "age"},
-								{"agg": "avg", "field": "age"},
+							"aggs": []interface{}{
+								map[string]interface{}{"agg": "sum", "field": "age"},
+								map[string]interface{}{"agg": "avg", "field": "age"},
 							},
 						},
-						{"agg": "sum", "field": "age"},
-						{"agg": "avg", "field": "age"},
+						map[string]interface{}{"agg": "sum", "field": "age"},
+						map[string]interface{}{"agg": "avg", "field": "age"},
 					},
 				},
 			},
@@ -197,23 +198,23 @@ func TestESProxy_Read(t *testing.T) {
 	Convey("查询并桶聚合", t, func() {
 		query := map[string]interface{}{
 			"search": map[string]interface{}{
-				"and": [][]interface{}{
-					{"lte", "age", 300},
+				"and": []interface{}{
+					[]interface{}{"lte", "age", 300},
 				},
 			},
-			"aggs": []map[string]interface{}{
-				{
+			"aggs": []interface{}{
+				map[string]interface{}{
 					"groupBy": "firstname.keyword",
-					"aggs": []map[string]interface{}{
-						{
+					"aggs": []interface{}{
+						map[string]interface{}{
 							"groupBy": "lastname.keyword",
-							"aggs": []map[string]interface{}{
-								{"agg": "sum", "field": "age"},
-								{"agg": "avg", "field": "age"},
+							"aggs": []interface{}{
+								map[string]interface{}{"agg": "sum", "field": "age"},
+								map[string]interface{}{"agg": "avg", "field": "age"},
 							},
 						},
-						{"agg": "sum", "field": "age"},
-						{"agg": "avg", "field": "age"},
+						map[string]interface{}{"agg": "sum", "field": "age"},
+						map[string]interface{}{"agg": "avg", "field": "age"},
 					},
 				},
 			},

@@ -21,7 +21,7 @@ import "errors"
 type Cut2DArrayFormat struct{}
 
 func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (result [][]interface{}, err error) {
-	keepTitle := args.([]string)
+	keepTitle := args.([]interface{})
 
 	return func(data interface{}) (result [][]interface{}, err error) {
 		if len(keepTitle) == 0 {
@@ -35,11 +35,10 @@ func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (re
 			result = append(result, arr)
 		}
 
-		for _, item := range data.([]interface{}) {
-			obj := item.(map[string]interface{})
+		for _, item := range data.([]map[string]interface{}) {
 			arr := make([]interface{}, 0)
 			for _, key := range keepTitle {
-				arr = append(arr, obj[key])
+				arr = append(arr, item[key.(string)])
 			}
 			result = append(result, arr)
 		}
