@@ -20,10 +20,11 @@ import "errors"
 
 type Cut2DArrayFormat struct{}
 
-func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (result [][]interface{}, err error) {
+func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (result interface{}, err error) {
 	keepTitle := args.([]interface{})
 
-	return func(data interface{}) (result [][]interface{}, err error) {
+	return func(data interface{}) (result interface{}, err error) {
+		tmpResult := make([][]interface{}, 0)
 		if len(keepTitle) == 0 {
 			err = errors.New("未设置要保留的2D数组表头")
 			return
@@ -32,7 +33,7 @@ func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (re
 			for _, i := range keepTitle {
 				arr = append(arr, i)
 			}
-			result = append(result, arr)
+			tmpResult = append(tmpResult, arr)
 		}
 
 		for _, item := range data.([]map[string]interface{}) {
@@ -40,8 +41,10 @@ func (format Cut2DArrayFormat) Exec(args interface{}) func(data interface{}) (re
 			for _, key := range keepTitle {
 				arr = append(arr, item[key.(string)])
 			}
-			result = append(result, arr)
+			tmpResult = append(tmpResult, arr)
 		}
+
+		result = tmpResult
 		return
 	}
 }

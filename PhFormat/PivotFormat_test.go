@@ -14,40 +14,50 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhFactory
+package PhFormat
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
-func TestPhTable_GetFormat(t *testing.T) {
-	name := "cut2DArray"
+func TestPivotFormat_Exec(t *testing.T) {
 	data := []map[string]interface{}{
 		{
 			"firstname": "A",
-			"lastname": "a",
-			"age": 11,
+			"lastname":  "a",
+			"age":       11,
+		},
+		{
+			"firstname": "A",
+			"lastname":  "b",
+			"age":       22,
 		},
 		{
 			"firstname": "B",
-			"lastname": "b",
-			"age": 22,
+			"lastname":  "a",
+			"age":       33,
 		},
 		{
-			"firstname": "C",
-			"lastname": "c",
-			"age": 33,
+			"firstname": "B",
+			"lastname":  "b",
+			"age":       44,
 		},
 	}
 
-	Convey("Test exec format by name", t, func() {
-		result, err := PhTable{}.GetFormat(name).Exec([]interface{}{"firstname", "age"})(data)
+	Convey("增加`比例`列", t, func() {
+		pivot := map[string]interface{}{
+			"yAxis": "firstname",
+			"xAxis": "lastname",
+			"value": "age",
+		}
+		result, err := PivotFormat{}.Exec(pivot)(data)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
+		So(len(result.([][]interface{})), ShouldEqual, 3)
 
-		first := result.([][]interface{})[0]
-		So(len(first), ShouldEqual, 2)
+		row := result.([][]interface{})[0]
+		So(len(row), ShouldEqual, 3)
 	})
 }

@@ -14,40 +14,27 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhFactory
+package PhFormat
 
-import (
-	. "github.com/smartystreets/goconvey/convey"
-	"testing"
-)
+type AddColFormat struct{}
 
-func TestPhTable_GetFormat(t *testing.T) {
-	name := "cut2DArray"
-	data := []map[string]interface{}{
-		{
-			"firstname": "A",
-			"lastname": "a",
-			"age": 11,
-		},
-		{
-			"firstname": "B",
-			"lastname": "b",
-			"age": 22,
-		},
-		{
-			"firstname": "C",
-			"lastname": "c",
-			"age": 33,
-		},
+func (format AddColFormat) Exec(args interface{}) func(data interface{}) (result interface{}, err error) {
+	addCols := args.([]interface{})
+
+	return func(data interface{}) (result interface{}, err error) {
+		dataMap := data.([]map[string]interface{})
+
+		for _, addCol := range addCols {
+			m := addCol.(map[string]interface {})
+			name := m["name"].(string)
+			value := m["value"]
+
+			for _, item := range dataMap {
+				item[name] = value
+			}
+		}
+
+		result = dataMap
+		return
 	}
-
-	Convey("Test exec format by name", t, func() {
-		result, err := PhTable{}.GetFormat(name).Exec([]interface{}{"firstname", "age"})(data)
-
-		So(err, ShouldBeNil)
-		So(result, ShouldNotBeNil)
-
-		first := result.([][]interface{})[0]
-		So(len(first), ShouldEqual, 2)
-	})
 }

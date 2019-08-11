@@ -14,15 +14,14 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhFactory
+package PhFormat
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
 
-func TestPhTable_GetFormat(t *testing.T) {
-	name := "cut2DArray"
+func TestAddColFormat_Exec(t *testing.T) {
 	data := []map[string]interface{}{
 		{
 			"firstname": "A",
@@ -41,13 +40,27 @@ func TestPhTable_GetFormat(t *testing.T) {
 		},
 	}
 
-	Convey("Test exec format by name", t, func() {
-		result, err := PhTable{}.GetFormat(name).Exec([]interface{}{"firstname", "age"})(data)
+	Convey("增加常数列", t, func() {
+		addCols := []interface{}{
+			map[string]interface{}{
+				"name": "newCol1",
+				"value": "value1",
+			},
+			map[string]interface{}{
+				"name": "newCol2",
+				"value": "value2",
+			},
+		}
+		result, err := AddColFormat{}.Exec(addCols)(data)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
 
-		first := result.([][]interface{})[0]
-		So(len(first), ShouldEqual, 2)
+		row := result.([]map[string]interface{})[0]
+		var keys = make([]string, 0)
+		for k, _ := range row {
+			keys = append(keys, k)
+		}
+		So(len(keys), ShouldEqual, 5)
 	})
 }

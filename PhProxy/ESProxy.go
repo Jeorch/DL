@@ -55,7 +55,7 @@ func (proxy ESProxy) connectES() *ESProxy {
 	var host = proxy.protocol + "://" + proxy.host + ":" + proxy.port
 
 	errorlog := log.New(os.Stdout, "ES: ", log.LstdFlags)
-	client, err := elastic.NewClient(elastic.SetSniff(false), elastic.SetErrorLog(errorlog), elastic.SetURL("http://localhost:9200"))
+	client, err := elastic.NewClient(elastic.SetSniff(false), elastic.SetErrorLog(errorlog), elastic.SetURL(host))
 	if err != nil {
 		panic(err)
 	}
@@ -71,6 +71,7 @@ func (proxy ESProxy) connectES() *ESProxy {
 		panic(err)
 	}
 	log.Printf("Elasticsearch version %s\n", esversion)
+	log.Println("ES Connect to :" + host)
 
 	proxy.esClient = client
 	return &proxy
@@ -80,7 +81,7 @@ func (proxy ESProxy) Create(table string, insert []map[string]interface{}) (resu
 	bulkRequest := proxy.esClient.Bulk()
 	for _, item := range insert {
 		req := elastic.NewBulkIndexRequest().Index(table).Doc(item)
-		bulkRequest.Add(req)
+		bulkRequest = bulkRequest.Add(req)
 	}
 	bulkResponse, err := bulkRequest.Do(context.Background())
 
@@ -109,12 +110,15 @@ func (proxy ESProxy) Update(table string, update []map[string]interface{}) (resu
 func (proxy ESProxy) Read(table []string, query map[string]interface{}) (result []map[string]interface{}, err error) {
 	searchService := proxy.esClient.Search(table...)
 
-	// search.sort / search.or / search.and
+	// search.size /search.sort / search.or / search.and
 	esCondUtil{ser: searchService}.
 		genQueryCond(query["search"]).
 		genAggCond(query["aggs"])
 
 	res, err := searchService.Do(context.Background())
+	if err != nil {
+		return
+	}
 	if res.Error != nil {
 		err = errors.New(res.Error.Reason)
 	}
@@ -161,7 +165,7 @@ func (util esCondUtil) genBaseQuery(oper []interface{}) elastic.Query {
 	case "lte":
 		query = elastic.NewRangeQuery(oper[1].(string)).Lte(oper[2])
 	default:
-		log.Fatal("不支持的查询函数" + oper[0].(string))
+		log.Println("不支持的查询函数" + oper[0].(string))
 	}
 	return query
 }
@@ -189,6 +193,7 @@ func (util esCondUtil) genBoolQuery(oper string, subOpers interface{}) elastic.Q
 	case "and":
 		query.Must(queries...)
 	default:
+		log.Println("不支持的查询函数" + oper)
 	}
 
 	return query
@@ -202,6 +207,8 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 
 	for k, v := range search.(map[string]interface{}) {
 		switch k {
+		case "size":
+			util.ser.Size(int(v.(float64)))
 		case "sort":
 			for _, str := range v.([]interface{}) {
 				if strings.HasPrefix(str.(string), "-") {
@@ -226,7 +233,7 @@ func (util esCondUtil) genBaseAgg(oper, field string) elastic.Aggregation {
 	case "avg":
 		agg = elastic.NewAvgAggregation().Field(field)
 	default:
-		log.Fatal("不支持的聚合函数" + oper)
+		log.Println("不支持的聚合函数" + oper)
 	}
 	return agg
 }
@@ -247,8 +254,9 @@ func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) elastic.Agg
 		if oper, ok := agg["agg"]; ok {
 			oper := oper.(string)
 			field := agg["field"].(string)
-			sub := util.genBaseAgg(oper, field)
-			terms.SubAggregation(oper+"("+field+")", sub)
+			if sub := util.genBaseAgg(oper, field); sub != nil {
+				terms.SubAggregation(oper+"("+field+")", sub)
+			}
 		}
 		if sub, ok := agg["groupBy"]; ok {
 			terms.SubAggregation(sub.(string), util.genRecAgg(agg))

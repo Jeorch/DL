@@ -98,15 +98,25 @@ func TestESProxy_Read(t *testing.T) {
 	})
 
 	Convey("查询全部文档", t, func() {
+		result, err := proxy.Read([]string{table}, nil)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 6)
+	})
+
+	Convey("查询3条文档", t, func() {
 
 		query := map[string]interface{}{
-			"search": nil,
+			"search": map[string]interface{}{
+				"size": 3.0,
+			},
 		}
 		result, err := proxy.Read([]string{table}, query)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
-		So(len(result), ShouldEqual, 6)
+		So(len(result), ShouldEqual, 3)
 	})
 
 	Convey("查询全部文档并递减排序", t, func() {
@@ -123,7 +133,7 @@ func TestESProxy_Read(t *testing.T) {
 		So(result[0]["age"], ShouldBeGreaterThan, result[1]["age"])
 	})
 
-	Convey("简单条件查询", t, func() {
+	Convey("简单条件查询 - and", t, func() {
 		query := map[string]interface{}{
 			"search": map[string]interface{}{
 				"sort" : []interface{}{"-age"},
@@ -142,6 +152,23 @@ func TestESProxy_Read(t *testing.T) {
 		So(result[0]["age"], ShouldBeGreaterThan, result[1]["age"])
 		So(result[0]["firstname"], ShouldEqual, "张")
 		So(result[1]["firstname"], ShouldEqual, "张")
+	})
+
+	Convey("简单条件查询 - or", t, func() {
+		query := map[string]interface{}{
+			"search": map[string]interface{}{
+				"sort" : []interface{}{"-age"},
+				"or": []interface{}{
+					[]interface{}{"eq", "firstname.keyword", "张"},
+					[]interface{}{"eq", "firstname.keyword", "李"},
+				},
+			},
+		}
+		result, err := proxy.Read([]string{table}, query)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+		So(len(result), ShouldEqual, 5)
 	})
 
 	Convey("嵌套查询", t, func() {

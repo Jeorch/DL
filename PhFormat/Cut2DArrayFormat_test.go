@@ -53,5 +53,8 @@ func TestCut2DArrayFormat_Exec(t *testing.T) {
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
+
+		first := result.([][]interface{})[0]
+		So(len(first), ShouldEqual, 2)
 	})
 }

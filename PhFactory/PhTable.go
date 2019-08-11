@@ -20,6 +20,9 @@ import "github.com/PharbersDeveloper/DL/PhFormat"
 
 var phFormatFactory = map[string]PhFormat.PhFormat{
 	"cut2DArray": PhFormat.Cut2DArrayFormat{},
+	"calcRate":   PhFormat.CalcRateFormat{},
+	"addCol":     PhFormat.AddColFormat{},
+	"pivot":      PhFormat.PivotFormat{},
 }
 
 type PhTable struct{}

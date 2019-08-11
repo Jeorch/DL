@@ -14,38 +14,47 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhModel
+package PhFormat
 
 import (
-	"github.com/PharbersDeveloper/DL/PhFactory"
-	"log"
-	"reflect"
+	. "github.com/smartystreets/goconvey/convey"
+	"testing"
 )
 
-type PhModel struct {
-	Model  string
-	Query  map[string]interface{}
-	Insert []map[string]interface{}
-	Update []map[string]interface{}
-	Format []map[string]interface{}
-}
-
-func (m PhModel) IsEmpty() bool {
-	return reflect.DeepEqual(m, PhModel{})
-}
-
-func (m PhModel) FormatResult(data interface{}) (result interface{}, err error) {
-	result = data
-	table := PhFactory.PhTable{}
-	for _, plugin := range m.Format {
-		if class := table.GetFormat(plugin["class"].(string)); class != nil {
-			result, err = class.Exec(plugin["args"])(data)
-			if err != nil {
-				return
-			}
-		} else {
-			log.Println("不存在Format：" + plugin["class"].(string))
-		}
+func TestCalcRateFormat_Exec(t *testing.T) {
+	data := []map[string]interface{}{
+		{
+			"firstname": "A",
+			"lastname": "a",
+			"age": 11,
+		},
+		{
+			"firstname": "B",
+			"lastname": "b",
+			"age": 22,
+		},
+		{
+			"firstname": "C",
+			"lastname": "c",
+			"age": 33,
+		},
 	}
-	return
+
+	Convey("增加`比例`列", t, func() {
+		rateTitle := []interface{}{"age"}
+		result, err := CalcRateFormat{}.Exec(rateTitle)(data)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+
+		for _, item := range result.([]map[string]interface{}) {
+			exits := false
+			for k, _ := range item {
+				if k == "rate(age)" {
+					exits = true
+				}
+			}
+			So(exits, ShouldBeTrue)
+		}
+	})
 }

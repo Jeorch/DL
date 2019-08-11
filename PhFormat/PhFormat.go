@@ -17,5 +17,5 @@
 package PhFormat
 
 type PhFormat interface {
-	Exec(args interface{}) func(data interface{}) (result [][]interface{}, err error)
+	Exec(args interface{}) func(data interface{}) (result interface{}, err error)
 }
