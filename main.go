@@ -26,13 +26,23 @@ import (
 	"time"
 )
 
-var ip = ""
-var port = "9001"
+var ip = "127.0.0.1"
+var port = "9201"
 var WriteTimeout = time.Second * 4
-var ESHost = "192.168.100.174"
+var ESHost = "127.0.0.1"
 var ESPort = "9200"
 
 func main() {
+	if ok := os.Getenv("DL_PORT"); ok != "" {
+		port = ok
+	}
+	if ok := os.Getenv("ES_HOST"); ok != "" {
+		ESHost = ok
+	}
+	if ok := os.Getenv("ES_PORT"); ok != "" {
+		ESPort = ok
+	}
+
 	addr := ip + ":" + port
 	proxy := PhProxy.ESProxy{}.NewProxy(map[string]string{
 		"host": ESHost,
