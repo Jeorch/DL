@@ -26,10 +26,10 @@ import (
 	"time"
 )
 
-var ip = "127.0.0.1"
+var ip = ""
 var port = "9201"
 var WriteTimeout = time.Second * 4
-var ESHost = "127.0.0.1"
+var ESHost = "192.168.100.174"
 var ESPort = "9200"
 
 func main() {

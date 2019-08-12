@@ -207,6 +207,8 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 
 	for k, v := range search.(map[string]interface{}) {
 		switch k {
+		case "from":
+			util.ser.From(int(v.(float64)))
 		case "size":
 			util.ser.Size(int(v.(float64)))
 		case "sort":
