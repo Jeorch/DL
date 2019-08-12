@@ -50,7 +50,7 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 			arr := make([]interface{}, 0)
 			arr = append(arr, y)
 			for _, x := range xSlice {
-				var tmp interface{}
+				var tmp interface{} = 0
 				for _, item := range dataMap {
 					if item[yAxis] == y && item[xAxis] == x {
 						tmp = item[value]
