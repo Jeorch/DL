@@ -45,7 +45,7 @@ func TestPivotFormat_Exec(t *testing.T) {
 		},
 	}
 
-	Convey("增加`比例`列", t, func() {
+	Convey("行转列展示", t, func() {
 		pivot := map[string]interface{}{
 			"yAxis": "-firstname",
 			"xAxis": "-lastname",

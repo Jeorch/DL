@@ -33,7 +33,7 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 		dataMap := data.([]map[string]interface{})
 		tmpResult := make([]interface{}, 0)
 
-		// 提取Y轴和X轴
+		// 提取Y轴和X轴，并排序
 		ySlice, yAxis := format.extractAxis(dataMap, yAxis)
 		xSlice, xAxis := format.extractAxis(dataMap, xAxis)
 		if len(xSlice) == 0 {
