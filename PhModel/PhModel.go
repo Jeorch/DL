@@ -39,7 +39,7 @@ func (m PhModel) FormatResult(data interface{}) (result interface{}, err error) 
 	table := PhFactory.PhTable{}
 	for _, plugin := range m.Format {
 		if class := table.GetFormat(plugin["class"].(string)); class != nil {
-			result, err = class.Exec(plugin["args"])(data)
+			result, err = class.Exec(plugin["args"])(result)
 			if err != nil {
 				return
 			}

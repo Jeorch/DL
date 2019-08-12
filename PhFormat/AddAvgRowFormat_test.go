@@ -21,43 +21,31 @@ import (
 	"testing"
 )
 
-func TestPivotFormat_Exec(t *testing.T) {
+func TestAddAvgRowFormat_Exec(t *testing.T) {
 	data := []map[string]interface{}{
 		{
 			"firstname": "A",
-			"lastname":  "a",
-			"age":       11,
-		},
-		{
-			"firstname": "A",
-			"lastname":  "b",
-			"age":       22,
+			"lastname": "a",
+			"age": 11,
 		},
 		{
 			"firstname": "B",
-			"lastname":  "a",
-			"age":       33,
+			"lastname": "b",
+			"age": 22,
 		},
 		{
-			"firstname": "B",
-			"lastname":  "b",
-			"age":       44,
+			"firstname": "C",
+			"lastname": "c",
+			"age": 33,
 		},
 	}
 
-	Convey("增加`比例`列", t, func() {
-		pivot := map[string]interface{}{
-			"yAxis": "-firstname",
-			"xAxis": "-lastname",
-			"value": "age",
-		}
-		result, err := PivotFormat{}.Exec(pivot)(data)
+	Convey("增加`平均`行", t, func() {
+		keepTitle := []interface{}{"firstname", "lastname"}
+		result, err := AddAvgRowFormat{}.Exec(keepTitle)(data)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
-		So(len(result.([]interface{})), ShouldEqual, 3)
-
-		row := result.([]interface{})[0].([]interface{})
-		So(len(row), ShouldEqual, 3)
+		So(len(result.([]map[string]interface{})), ShouldEqual, 4)
 	})
 }

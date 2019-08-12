@@ -71,7 +71,7 @@ func (proxy ESProxy) connectES() *ESProxy {
 		panic(err)
 	}
 	log.Printf("Elasticsearch version %s\n", esversion)
-	log.Println("ES Connect to :" + host)
+	log.Println("ES Connect To: " + host)
 
 	proxy.esClient = client
 	return &proxy
@@ -228,10 +228,14 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 func (util esCondUtil) genBaseAgg(oper, field string) elastic.Aggregation {
 	var agg elastic.Aggregation
 	switch oper {
-	case "sum":
-		agg = elastic.NewSumAggregation().Field(field)
+	case "max":
+		agg = elastic.NewMaxAggregation().Field(field)
+	case "min":
+		agg = elastic.NewMinAggregation().Field(field)
 	case "avg":
 		agg = elastic.NewAvgAggregation().Field(field)
+	case "sum":
+		agg = elastic.NewSumAggregation().Field(field)
 	default:
 		log.Println("不支持的聚合函数" + oper)
 	}

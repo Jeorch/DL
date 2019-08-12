@@ -14,22 +14,37 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
-package PhFactory
 
-import "github.com/PharbersDeveloper/DL/PhFormat"
+package PhFormat
 
-var phFormatFactory = map[string]PhFormat.PhFormat{
-	"filter":     PhFormat.FilterFormat{},
-	"cut2DArray": PhFormat.Cut2DArrayFormat{},
-	"calcRate":   PhFormat.CalcRateFormat{},
-	"calcAvg":    PhFormat.CalcAvgFormat{},
-	"addCol":     PhFormat.AddColFormat{},
-	"addAvgRow":  PhFormat.AddAvgRowFormat{},
-	"pivot":      PhFormat.PivotFormat{},
+func any2float64(any interface{}) float64 {
+	switch t := any.(type) {
+	case int:
+		return float64(t)
+	case int64:
+		return float64(t)
+	case float32:
+		return float64(t)
+	case float64:
+		return t
+	default:
+		return 0
+	}
 }
 
-type PhTable struct{}
+func sliceExist(slice []interface{}, item interface{}) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
 
-func (t PhTable) GetFormat(name string) PhFormat.PhFormat {
-	return phFormatFactory[name]
+func sliceReverse(slice []interface{}) {
+	for i := len(slice)/2 - 1; i >= 0; i-- {
+		opp := len(slice) - 1 - i
+		slice[i], slice[opp] = slice[opp], slice[i]
+	}
+	return
 }

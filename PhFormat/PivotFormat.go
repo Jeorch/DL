@@ -16,7 +16,10 @@
  */
 package PhFormat
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type PivotFormat struct{}
 
@@ -25,18 +28,14 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 	yAxis := tmpArgs["yAxis"].(string)
 	xAxis := tmpArgs["xAxis"].(string)
 	value := tmpArgs["value"].(string)
-	var reverse bool
-	if ok := tmpArgs["reverse"]; ok != nil {
-		reverse = ok.(bool)
-	}
 
 	return func(data interface{}) (result interface{}, err error) {
 		dataMap := data.([]map[string]interface{})
-		tmpResult := make([][]interface{}, 0)
+		tmpResult := make([]interface{}, 0)
 
 		// 提取Y轴和X轴
-		ySlice := format.extractAxis(dataMap, yAxis)
-		xSlice := format.extractAxis(dataMap, xAxis)
+		ySlice, yAxis := format.extractAxis(dataMap, yAxis)
+		xSlice, xAxis := format.extractAxis(dataMap, xAxis)
 		if len(xSlice) == 0 {
 			err = errors.New("X 轴错误，key不存在")
 			return
@@ -63,26 +62,25 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 			tmpResult = append(tmpResult, arr)
 		}
 
-		// 是否反转数组
-		if reverse {
-			for i := len(tmpResult)/2 - 1; i >= 0; i-- {
-				opp := len(tmpResult) - 1 - i
-				tmpResult[i], tmpResult[opp] = tmpResult[opp], tmpResult[i]
-			}
-		}
-
 		head := append([]interface{}{value}, xSlice...)
-		tmpResult = append([][]interface{}{head}, tmpResult...)
+		tmpResult = append([]interface{}{head}, tmpResult...)
 
 		result = tmpResult
 		return
 	}
 }
 
-func (format PivotFormat) extractAxis(data []map[string]interface{}, key string) []interface{} {
+func (format PivotFormat) extractAxis(data []map[string]interface{}, key string) ([]interface{}, string) {
+	var reverse bool
+	if strings.HasPrefix(key, "-") {
+		reverse = true
+		key = key[1:]
+	}
+
 	arr := make([]interface{}, 0)
+	// 提取
 	for _, item := range data {
-		if format.exist(arr, item[key]) {
+		if sliceExist(arr, item[key]) {
 			continue
 		}
 		if v, ok := item[key]; ok {
@@ -90,14 +88,22 @@ func (format PivotFormat) extractAxis(data []map[string]interface{}, key string)
 		}
 	}
 
-	return arr
+	// 排序
+	sorted := func(slice []interface{}) []interface{}{
+		for i := 0; i < len(slice); i++ {
+			for j := 1; j < len(slice)-i; j++ {
+				if slice[j].(string) < slice[j-1].(string) {
+					slice[j], slice[j-1] = slice[j-1], slice[j]
+				}
+			}
+		}
+		return slice
+	}(arr)
+
+	if reverse {
+		sliceReverse(sorted)
+	}
+
+	return sorted, key
 }
 
-func (format PivotFormat) exist(s []interface{}, e interface{}) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}

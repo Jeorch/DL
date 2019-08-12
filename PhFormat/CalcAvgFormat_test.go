@@ -21,43 +21,40 @@ import (
 	"testing"
 )
 
-func TestPivotFormat_Exec(t *testing.T) {
+func TestCalcAvgFormat_Exec(t *testing.T) {
 	data := []map[string]interface{}{
 		{
 			"firstname": "A",
-			"lastname":  "a",
-			"age":       11,
-		},
-		{
-			"firstname": "A",
-			"lastname":  "b",
-			"age":       22,
+			"lastname": "a",
+			"age": 11,
 		},
 		{
 			"firstname": "B",
-			"lastname":  "a",
-			"age":       33,
+			"lastname": "b",
+			"age": 22,
 		},
 		{
-			"firstname": "B",
-			"lastname":  "b",
-			"age":       44,
+			"firstname": "C",
+			"lastname": "c",
+			"age": 33,
 		},
 	}
 
-	Convey("增加`比例`列", t, func() {
-		pivot := map[string]interface{}{
-			"yAxis": "-firstname",
-			"xAxis": "-lastname",
-			"value": "age",
-		}
-		result, err := PivotFormat{}.Exec(pivot)(data)
+	Convey("增加`平均`列", t, func() {
+		avgTitle := []interface{}{"age"}
+		result, err := CalcAvgFormat{}.Exec(avgTitle)(data)
 
 		So(err, ShouldBeNil)
 		So(result, ShouldNotBeNil)
-		So(len(result.([]interface{})), ShouldEqual, 3)
 
-		row := result.([]interface{})[0].([]interface{})
-		So(len(row), ShouldEqual, 3)
+		for _, item := range result.([]map[string]interface{}) {
+			exits := false
+			for k, _ := range item {
+				if k == "avg(age)" {
+					exits = true
+				}
+			}
+			So(exits, ShouldBeTrue)
+		}
 	})
 }

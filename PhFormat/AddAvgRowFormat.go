@@ -18,33 +18,43 @@ package PhFormat
 
 import "fmt"
 
-type CalcRateFormat struct{}
+type AddAvgRowFormat struct{}
 
-func (format CalcRateFormat) Exec(args interface{}) func(data interface{}) (result interface{}, err error) {
-	rateTitle := args.([]interface{})
+func (format AddAvgRowFormat) Exec(args interface{}) func(data interface{}) (result interface{}, err error) {
+	keepTitle := args.([]interface{})
 
 	return func(data interface{}) (result interface{}, err error) {
 		dataMap := data.([]map[string]interface{})
 
-		for _, title := range rateTitle {
-			title := title.(string)
+		sumMap := make(map[string]float64)
+		avgMap := make(map[string]float64)
+		count := 0.0
 
-			var sum float64
-			for _, item := range dataMap {
-				sum += any2float64(item[title])
-			}
-
-			key := "rate(" + title + ")"
-			for _, item := range dataMap {
-				if sum == 0 {
-					item[key] = 0
+		for _, item := range dataMap {
+			for k, v := range item {
+				if s, ok := sumMap[k]; ok {
+					sumMap[k] = s + any2float64(v)
 				} else {
-					item[key] = fmt.Sprintf("%.4f", any2float64(item[title]) / sum)
+					sumMap[k] = any2float64(v)
 				}
 			}
+			count += 1
 		}
 
-		result = dataMap
+		for k, v := range sumMap {
+			avgMap[k] = v / count
+		}
+
+		tmp := make(map[string]interface{})
+		for k, v := range avgMap {
+			if sliceExist(keepTitle, k) {
+				tmp[k] = "平均值"
+			} else {
+				tmp[k] = fmt.Sprintf("%.4f", v)
+			}
+		}
+		result = append(dataMap, tmp)
 		return
 	}
 }
+
