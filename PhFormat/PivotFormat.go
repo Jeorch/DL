@@ -31,7 +31,6 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 
 	return func(data interface{}) (result interface{}, err error) {
 		dataMap := data.([]map[string]interface{})
-		tmpResult := make([]interface{}, 0)
 
 		// 提取Y轴和X轴，并排序
 		ySlice, yAxis := format.extractAxis(dataMap, yAxis)
@@ -45,23 +44,25 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 			return
 		}
 
-		// 写入内容
-		for _, y := range ySlice {
-			arr := make([]interface{}, 0)
-			arr = append(arr, y)
-			for _, x := range xSlice {
-				var tmp interface{} = 0
-				for _, item := range dataMap {
-					if item[yAxis] == y && item[xAxis] == x {
-						tmp = item[value]
-						break
-					}
-				}
-				arr = append(arr, tmp)
-			}
-			tmpResult = append(tmpResult, arr)
+		// 初始化二维数组
+		tmpResult := make([]interface{}, len(ySlice))
+		for i := 0; i < len(ySlice); i++ {
+			tmpX := make([]interface{}, len(xSlice)+1)
+			tmpX[0] = ySlice[i]
+			tmpResult[i] = tmpX
 		}
 
+		// 写入内容
+		for _, item := range dataMap {
+			y := sliceIndex(ySlice, item[yAxis])
+			x := sliceIndex(xSlice, item[xAxis])
+			if y > -1 && x > -1 {
+				tmpY := tmpResult[y].([]interface{})
+				tmpY[x+1] = item[value]
+			}
+		}
+
+		// 写入表头
 		head := append([]interface{}{value}, xSlice...)
 		tmpResult = append([]interface{}{head}, tmpResult...)
 
@@ -80,7 +81,7 @@ func (format PivotFormat) extractAxis(data []map[string]interface{}, key string)
 	arr := make([]interface{}, 0)
 	// 提取
 	for _, item := range data {
-		if sliceExist(arr, item[key]) {
+		if sliceIndex(arr, item[key]) != -1 {
 			continue
 		}
 		if v, ok := item[key]; ok {
@@ -89,21 +90,11 @@ func (format PivotFormat) extractAxis(data []map[string]interface{}, key string)
 	}
 
 	// 排序
-	sorted := func(slice []interface{}) []interface{}{
-		for i := 0; i < len(slice); i++ {
-			for j := 1; j < len(slice)-i; j++ {
-				if slice[j].(string) < slice[j-1].(string) {
-					slice[j], slice[j-1] = slice[j-1], slice[j]
-				}
-			}
-		}
-		return slice
-	}(arr)
+	sliceBubbleSort(arr)
 
 	if reverse {
-		sliceReverse(sorted)
+		sliceReverse(arr)
 	}
 
-	return sorted, key
+	return arr, key
 }
-

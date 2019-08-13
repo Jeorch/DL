@@ -32,13 +32,13 @@ func any2float64(any interface{}) float64 {
 	}
 }
 
-func sliceExist(slice []interface{}, item interface{}) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
+func sliceIndex(slice []interface{}, item interface{}) int {
+	for i, val := range slice {
+		if val == item {
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 func sliceReverse(slice []interface{}) {
@@ -48,3 +48,50 @@ func sliceReverse(slice []interface{}) {
 	}
 	return
 }
+
+func sliceBubbleSort(slice []interface{}) {
+	for i := 0; i < len(slice); i++ {
+		for j := 1; j < len(slice)-i; j++ {
+			if slice[j].(string) < slice[j-1].(string) {
+				slice[j], slice[j-1] = slice[j-1], slice[j]
+			}
+		}
+	}
+}
+
+func sliceQuickSortByString(slice []interface{}) {
+	recursionSort := func(nums []interface{}, left int, right int){}
+
+	recursionSort = func(nums []interface{}, left int, right int){
+		partition := func(nums []interface{}, left int, right int) int {
+			for left < right {
+				for left < right && nums[left].(string) <= nums[right].(string) {
+					right--
+				}
+				if left < right {
+					nums[left], nums[right] = nums[right], nums[left]
+					left++
+				}
+
+				for left < right && nums[left].(string) <= nums[right].(string) {
+					left++
+				}
+				if left < right {
+					nums[left], nums[right] = nums[right], nums[left]
+					right--
+				}
+			}
+
+			return left
+		}
+
+		if left < right {
+			pivot := partition(nums, left, right)
+			recursionSort(nums, left, pivot-1)
+			recursionSort(nums, pivot+1, right)
+		}
+	}
+
+	recursionSort(slice, 0, len(slice)-1)
+}
+

@@ -47,7 +47,7 @@ func (format AddAvgRowFormat) Exec(args interface{}) func(data interface{}) (res
 
 		tmp := make(map[string]interface{})
 		for k, v := range avgMap {
-			if sliceExist(keepTitle, k) {
+			if sliceIndex(keepTitle, k) != -1 {
 				tmp[k] = "平均值"
 			} else {
 				tmp[k] = fmt.Sprintf("%.4f", v)
