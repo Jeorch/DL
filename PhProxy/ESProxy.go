@@ -215,6 +215,8 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 			for _, str := range v.([]interface{}) {
 				if strings.HasPrefix(str.(string), "-") {
 					util.ser.Sort(str.(string)[1:], false)
+				} else if strings.HasPrefix(str.(string), "+") {
+					util.ser.Sort(str.(string)[1:], true)
 				} else {
 					util.ser.Sort(str.(string), true)
 				}
@@ -227,7 +229,7 @@ func (util esCondUtil) genQueryCond(search interface{}) esCondUtil {
 	return util
 }
 
-func (util esCondUtil) genBaseAgg(oper, field string) elastic.Aggregation {
+func (util esCondUtil) genBaseAgg(oper, field string) (string, elastic.Aggregation) {
 	var agg elastic.Aggregation
 	switch oper {
 	case "max":
@@ -241,35 +243,58 @@ func (util esCondUtil) genBaseAgg(oper, field string) elastic.Aggregation {
 	default:
 		log.Println("不支持的聚合函数" + oper)
 	}
-	return agg
+	return oper + "(" + field + ")", agg
 }
 
-func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) elastic.Aggregation {
-	key := aggregation["groupBy"].(string)
+func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) (field string, result elastic.Aggregation) {
+	field = aggregation["groupBy"].(string)
 	aggs := aggregation["aggs"].([]interface{})
 
 	terms := elastic.NewTermsAggregation()
-	if strings.HasPrefix(key, "-") {
-		terms.Field(key[1:]).OrderByKey(false)
+	if strings.HasPrefix(field, "-") {
+		field = field[1:]
+		terms.Field(field).OrderByKey(false)
+	} else if strings.HasPrefix(field, "+") {
+		field = field[1:]
+		terms.Field(field).OrderByKey(true)
 	} else {
-		terms.Field(key).OrderByKey(true)
+		terms.Field(field)
 	}
 
 	for _, agg := range aggs {
 		agg := agg.(map[string]interface{})
+
+		if _, ok := agg["groupBy"]; ok {
+			terms.SubAggregation(util.genRecAgg(agg))
+		}
+
 		if oper, ok := agg["agg"]; ok {
 			oper := oper.(string)
 			field := agg["field"].(string)
-			if sub := util.genBaseAgg(oper, field); sub != nil {
-				terms.SubAggregation(oper+"("+field+")", sub)
+
+			sort := ""
+			if strings.HasPrefix(field, "-") {
+				sort = "desc"
+				field = field[1:]
+			} else if strings.HasPrefix(field, "+") {
+				sort = "asc"
+				field = field[1:]
 			}
-		}
-		if sub, ok := agg["groupBy"]; ok {
-			terms.SubAggregation(sub.(string), util.genRecAgg(agg))
+
+			if name, sub := util.genBaseAgg(oper, field); sub != nil {
+				terms.SubAggregation(name, sub)
+				switch sort {
+				case "desc":
+					terms.SubAggregation("sort("+name+")", elastic.NewBucketSortAggregation().Sort(name, false))
+				case "asc":
+					terms.SubAggregation("sort("+name+")", elastic.NewBucketSortAggregation().Sort(name, true))
+				default:
+				}
+			}
 		}
 	}
 
-	return terms
+	return field, terms
 }
 
 func (util esCondUtil) genAggCond(aggs interface{}) esCondUtil {
@@ -278,8 +303,7 @@ func (util esCondUtil) genAggCond(aggs interface{}) esCondUtil {
 	}
 
 	for _, item := range aggs.([]interface{}) {
-		key := item.(map[string]interface{})["groupBy"].(string)
-		util.ser.Aggregation(key, util.genRecAgg(item.(map[string]interface{})))
+		util.ser.Aggregation(util.genRecAgg(item.(map[string]interface{})))
 	}
 
 	return util
@@ -321,7 +345,7 @@ func (util esGetResultUtil) getAggRec(data map[string]interface{}) (result []map
 		if buckets, ok := valueMap["buckets"]; ok {
 			for _, item := range buckets.([]interface{}) {
 				bucket := item.(map[string]interface{})
-				key := bucket["key"].(string)
+				key := bucket["key"]
 				delete(bucket, "key")
 				delete(bucket, "doc_count")
 				for _, sub := range util.getAggRec(bucket) {

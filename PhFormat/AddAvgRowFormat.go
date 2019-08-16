@@ -16,7 +16,10 @@
  */
 package PhFormat
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type AddAvgRowFormat struct{}
 
@@ -50,7 +53,12 @@ func (format AddAvgRowFormat) Exec(args interface{}) func(data interface{}) (res
 			if sliceIndex(keepTitle, k) != -1 {
 				tmp[k] = "平均值"
 			} else {
-				tmp[k] = fmt.Sprintf("%.4f", v)
+				str := fmt.Sprintf("%.4f", v)
+				if fl, err := strconv.ParseFloat(str, 64); err != nil {
+					return nil, err
+				} else {
+					tmp[k] = fl
+				}
 			}
 		}
 		result = append(dataMap, tmp)

@@ -17,6 +17,11 @@
 
 package PhFormat
 
+import (
+	"fmt"
+	"log"
+)
+
 func any2float64(any interface{}) float64 {
 	switch t := any.(type) {
 	case int:
@@ -50,9 +55,27 @@ func sliceReverse(slice []interface{}) {
 }
 
 func sliceBubbleSort(slice []interface{}) {
+	compare := func(prev, next interface{}) bool {
+		switch t := prev.(type) {
+		case int:
+			return t > next.(int)
+		case int64:
+			return t > next.(int64)
+		case float32:
+			return t > next.(float32)
+		case float64:
+			return t > next.(float64)
+		case string:
+			return t > next.(string)
+		default:
+			log.Fatal(fmt.Sprint("%v, %v not support compare", prev, next))
+			return true
+		}
+	}
+
 	for i := 0; i < len(slice); i++ {
 		for j := 1; j < len(slice)-i; j++ {
-			if slice[j].(string) < slice[j-1].(string) {
+			if compare(slice[j-1], slice[j]) {
 				slice[j], slice[j-1] = slice[j-1], slice[j]
 			}
 		}
@@ -60,9 +83,9 @@ func sliceBubbleSort(slice []interface{}) {
 }
 
 func sliceQuickSortByString(slice []interface{}) {
-	recursionSort := func(nums []interface{}, left int, right int){}
+	recursionSort := func(nums []interface{}, left int, right int) {}
 
-	recursionSort = func(nums []interface{}, left int, right int){
+	recursionSort = func(nums []interface{}, left int, right int) {
 		partition := func(nums []interface{}, left int, right int) int {
 			for left < right {
 				for left < right && nums[left].(string) <= nums[right].(string) {
@@ -94,4 +117,3 @@ func sliceQuickSortByString(slice []interface{}) {
 
 	recursionSort(slice, 0, len(slice)-1)
 }
-

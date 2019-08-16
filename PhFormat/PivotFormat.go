@@ -72,9 +72,12 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 }
 
 func (format PivotFormat) extractAxis(data []map[string]interface{}, key string) ([]interface{}, string) {
-	var reverse bool
+	sort := ""
 	if strings.HasPrefix(key, "-") {
-		reverse = true
+		sort = "desc"
+		key = key[1:]
+	} else if strings.HasPrefix(key, "+") {
+		sort = "asc"
 		key = key[1:]
 	}
 
@@ -89,11 +92,13 @@ func (format PivotFormat) extractAxis(data []map[string]interface{}, key string)
 		}
 	}
 
-	// 排序
-	sliceBubbleSort(arr)
-
-	if reverse {
+	switch sort {
+	case "desc":
+		sliceBubbleSort(arr)
 		sliceReverse(arr)
+	case "asc":
+		sliceBubbleSort(arr)
+	default:
 	}
 
 	return arr, key
