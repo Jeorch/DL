@@ -68,7 +68,7 @@ func sliceBubbleSort(slice []interface{}) {
 		case string:
 			return t > next.(string)
 		default:
-			log.Fatal(fmt.Sprint("%v, %v not support compare", prev, next))
+			log.Fatal(fmt.Sprintf("%#v, %#v not support compare", prev, next))
 			return true
 		}
 	}

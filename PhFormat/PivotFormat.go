@@ -28,6 +28,10 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 	yAxis := tmpArgs["yAxis"].(string)
 	xAxis := tmpArgs["xAxis"].(string)
 	value := tmpArgs["value"].(string)
+	head := value
+	if val, ok := tmpArgs["head"]; ok {
+		head = val.(string)
+	}
 
 	return func(data interface{}) (result interface{}, err error) {
 		dataMap := data.([]map[string]interface{})
@@ -63,8 +67,8 @@ func (format PivotFormat) Exec(args interface{}) func(data interface{}) (result 
 		}
 
 		// 写入表头
-		head := append([]interface{}{value}, xSlice...)
-		tmpResult = append([]interface{}{head}, tmpResult...)
+		firstRow := append([]interface{}{head}, xSlice...)
+		tmpResult = append([]interface{}{firstRow}, tmpResult...)
 
 		result = tmpResult
 		return

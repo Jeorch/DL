@@ -19,8 +19,9 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 			bmlog.StandardLogger().Error("Error of the model : " + r.URL.RawQuery)
 			response = []byte("Error of the model : " + r.URL.RawQuery)
 		} else {
-			bmlog.StandardLogger().Infof("%s : %#v", r.Method, model)
+			//bmlog.StandardLogger().Infof("%s : %#v", r.Method, model)
 			log.Printf("%s : %#v", r.Method, model)
+
 			switch r.Method {
 			case "PUT":
 				response = []byte("Not Supported")
@@ -29,7 +30,7 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 			case "POST":
 				response = []byte("Not Supported")
 			case "GET":
-				bmlog.StandardLogger().Infof("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
+				//bmlog.StandardLogger().Infof("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
 				log.Printf("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
 
 				tables := strings.Split(model.Model, ",")
@@ -38,6 +39,7 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 					response = []byte("Query Error: " + err.Error())
 				} else {
 					if formatResult, err := model.FormatResult(readResult); err != nil {
+						bmlog.StandardLogger().Error("Query Error: " + err.Error())
 						response = []byte("Format Error: " + err.Error())
 					} else {
 						response, err = json.Marshal(formatResult)

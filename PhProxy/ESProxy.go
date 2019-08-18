@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/alfredyang1986/blackmirror/bmlog"
 	"github.com/olivere/elastic/v7"
 	"log"
 	"os"
@@ -64,12 +65,15 @@ func (proxy ESProxy) connectES() *ESProxy {
 	if err != nil {
 		panic(err)
 	}
+	bmlog.StandardLogger().Infof("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
 	log.Printf("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
 
 	esversion, err := client.ElasticsearchVersion(host)
 	if err != nil {
 		panic(err)
 	}
+	bmlog.StandardLogger().Infof("Elasticsearch version %s\n", esversion)
+	bmlog.StandardLogger().Info("ES Connect To: " + host)
 	log.Printf("Elasticsearch version %s\n", esversion)
 	log.Println("ES Connect To: " + host)
 
@@ -165,6 +169,7 @@ func (util esCondUtil) genBaseQuery(oper []interface{}) elastic.Query {
 	case "lte":
 		query = elastic.NewRangeQuery(oper[1].(string)).Lte(oper[2])
 	default:
+		bmlog.StandardLogger().Warn("不支持的查询函数" + oper[0].(string))
 		log.Println("不支持的查询函数" + oper[0].(string))
 	}
 	return query
@@ -193,6 +198,7 @@ func (util esCondUtil) genBoolQuery(oper string, subOpers interface{}) elastic.Q
 	case "and":
 		query.Must(queries...)
 	default:
+		bmlog.StandardLogger().Warn("不支持的查询函数" + oper)
 		log.Println("不支持的查询函数" + oper)
 	}
 
@@ -241,6 +247,7 @@ func (util esCondUtil) genBaseAgg(oper, field string) (string, elastic.Aggregati
 	case "sum":
 		agg = elastic.NewSumAggregation().Field(field)
 	default:
+		bmlog.StandardLogger().Warn("不支持的聚合函数" + oper)
 		log.Println("不支持的聚合函数" + oper)
 	}
 	return oper + "(" + field + ")", agg

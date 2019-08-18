@@ -71,7 +71,7 @@ func main() {
 		Handler:      mux,
 	}
 
-	bmlog.StandardLogger().Error("Starting httpserver in " + port)
+	bmlog.StandardLogger().Info("Starting httpserver in " + port)
 	log.Println("Starting httpserver in " + port)
 
 	go func() {

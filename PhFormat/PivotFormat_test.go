@@ -50,6 +50,7 @@ func TestPivotFormat_Exec(t *testing.T) {
 			"yAxis": "-firstname",
 			"xAxis": "-lastname",
 			"value": "age",
+			"head": "head",
 		}
 		result, err := PivotFormat{}.Exec(pivot)(data)
 
