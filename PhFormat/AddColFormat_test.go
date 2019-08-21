@@ -22,25 +22,28 @@ import (
 )
 
 func TestAddColFormat_Exec(t *testing.T) {
-	data := []map[string]interface{}{
-		{
-			"firstname": "A",
-			"lastname": "a",
-			"age": 11,
-		},
-		{
-			"firstname": "B",
-			"lastname": "b",
-			"age": 22,
-		},
-		{
-			"firstname": "C",
-			"lastname": "c",
-			"age": 33,
-		},
-	}
-
 	Convey("增加常数列", t, func() {
+		data := []map[string]interface{}{
+			{
+				"firstname": "A",
+				"lastname": "a",
+				"age": 11,
+				"factor": 3,
+			},
+			{
+				"firstname": "B",
+				"lastname": "b",
+				"age": 22,
+				"factor": 5,
+			},
+			{
+				"firstname": "C",
+				"lastname": "c",
+				"age": 33,
+				"factor": 7,
+			},
+		}
+
 		addCols := []interface{}{
 			map[string]interface{}{
 				"name": "newCol1",
@@ -62,5 +65,140 @@ func TestAddColFormat_Exec(t *testing.T) {
 			keys = append(keys, k)
 		}
 		So(len(keys), ShouldEqual, 5)
+	})
+
+	Convey("增加引用列", t, func() {
+		data := []map[string]interface{}{
+			{
+				"firstname": "A",
+				"lastname": "a",
+				"age": 11,
+				"factor": 3,
+			},
+			{
+				"firstname": "B",
+				"lastname": "b",
+				"age": 22,
+				"factor": 5,
+			},
+			{
+				"firstname": "C",
+				"lastname": "c",
+				"age": 33,
+				"factor": 7,
+			},
+		}
+
+		addCols := []interface{}{
+			map[string]interface{}{
+				"name": "newCol1",
+				"value": []interface{}{"$", "age"},
+			},
+			map[string]interface{}{
+				"name": "newCol2",
+				"value": []interface{}{"$", "factor"},
+			},
+		}
+		result, err := AddColFormat{}.Exec(addCols)(data)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+
+		row := result.([]map[string]interface{})[0]
+		var keys = make([]string, 0)
+		for k, _ := range row {
+			keys = append(keys, k)
+		}
+		So(len(keys), ShouldEqual, 6)
+	})
+
+	Convey("增加计算列", t, func() {
+		data := []map[string]interface{}{
+			{
+				"firstname": "A",
+				"lastname": "a",
+				"age": 11,
+				"factor": 3,
+			},
+			{
+				"firstname": "B",
+				"lastname": "b",
+				"age": 22,
+				"factor": 5,
+			},
+			{
+				"firstname": "C",
+				"lastname": "c",
+				"age": 33,
+				"factor": 7,
+			},
+		}
+
+		addCols := []interface{}{
+			map[string]interface{}{
+				"name": "newCol1",
+				"value": []interface{}{"*", "age", "factor"},
+			},
+			map[string]interface{}{
+				"name": "newCol2",
+				"value": []interface{}{"/", "age", "factor"},
+			},
+		}
+		result, err := AddColFormat{}.Exec(addCols)(data)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+
+		row := result.([]map[string]interface{})[0]
+		var keys = make([]string, 0)
+		for k, _ := range row {
+			keys = append(keys, k)
+		}
+		So(len(keys), ShouldEqual, 6)
+	})
+
+	Convey("增加嵌套计算列", t, func() {
+		data := []map[string]interface{}{
+			{
+				"firstname": "A",
+				"lastname": "a",
+				"age": 11,
+				"factor": 3,
+			},
+			{
+				"firstname": "B",
+				"lastname": "b",
+				"age": 22,
+				"factor": 5,
+			},
+			{
+				"firstname": "C",
+				"lastname": "c",
+				"age": 33,
+				"factor": 7,
+			},
+		}
+
+		addCols := []interface{}{
+			map[string]interface{}{
+				"name": "newCol1",
+				"value": []interface{}{"*", []interface{}{"+", "age", "age"}, "factor"},
+			},
+			map[string]interface{}{
+				"name": "newCol2",
+				"value": []interface{}{"/", []interface{}{"+", "age", []interface{}{"=", 1}}, "factor"},
+			},
+		}
+		result, err := AddColFormat{}.Exec(addCols)(data)
+
+		So(err, ShouldBeNil)
+		So(result, ShouldNotBeNil)
+
+		row := result.([]map[string]interface{})[0]
+		var keys = make([]string, 0)
+		for k, _ := range row {
+			keys = append(keys, k)
+		}
+		So(len(keys), ShouldEqual, 6)
 	})
 }

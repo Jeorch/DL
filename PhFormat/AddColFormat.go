@@ -16,25 +16,101 @@
  */
 package PhFormat
 
+import (
+	"errors"
+	"fmt"
+)
+
 type AddColFormat struct{}
 
 func (format AddColFormat) Exec(args interface{}) func(data interface{}) (result interface{}, err error) {
 	addCols := args.([]interface{})
 
-	return func(data interface{}) (result interface{}, err error) {
+	return func(data interface{}) (interface{}, error) {
 		dataMap := data.([]map[string]interface{})
 
 		for _, addCol := range addCols {
-			m := addCol.(map[string]interface {})
+			m := addCol.(map[string]interface{})
 			name := m["name"].(string)
-			value := m["value"]
+
+			// TODO：为了向前兼容
+			switch m["value"].(type) {
+			case string:
+				m["value"] = []interface{}{"=", m["value"]}
+			}
 
 			for _, item := range dataMap {
+				value, err := format.calcResult(m["value"], item)
+				if err != nil {
+					return nil, err
+				}
 				item[name] = value
 			}
 		}
 
-		result = dataMap
-		return
+		return dataMap, nil
 	}
+}
+
+func (format AddColFormat) calcResult(expr interface{}, row map[string]interface{}) (interface{}, error) {
+	switch exprType := expr.(type) {
+	case []interface{}:
+		switch oper := exprType[0].(string); oper {
+		case "=":
+			return exprType[1], nil
+		case "$":
+			return format.calcResult(exprType[1], row)
+		case "+":
+			left, right, err := format.doubleNumber(exprType, row)
+			if err != nil {
+				return nil, err
+			}
+			result := any2float64(left) + any2float64(right)
+			return result, nil
+		case "-":
+			left, right, err := format.doubleNumber(exprType, row)
+			if err != nil {
+				return nil, err
+			}
+			result := any2float64(left) - any2float64(right)
+			return result, nil
+		case "*":
+			left, right, err := format.doubleNumber(exprType, row)
+			if err != nil {
+				return nil, err
+			}
+			result := any2float64(left) * any2float64(right)
+			return result, nil
+		case "/":
+			left, right, err := format.doubleNumber(exprType, row)
+			if err != nil {
+				return nil, err
+			}
+			result := fmt.Sprintf("%.4f", any2float64(left)/any2float64(right))
+			return result, nil
+		default:
+			return nil, errors.New(oper + "不支持的运算符")
+		}
+	default:
+		value := row[exprType.(string)]
+		if value == nil {
+			return nil, errors.New("key 值不存在：" + exprType.(string))
+		}
+		return value, nil
+	}
+}
+
+func (format AddColFormat) doubleNumber(exprSlice []interface{}, row map[string]interface{}) (interface{}, interface{}, error) {
+	if len(exprSlice) != 3 {
+		return nil, nil, errors.New("运算表达式不足3位")
+	}
+	left, err := format.calcResult(exprSlice[1], row)
+	if err != nil {
+		return nil, nil, err
+	}
+	right, err := format.calcResult(exprSlice[2], row)
+	if err != nil {
+		return nil, nil, err
+	}
+	return left, right, nil
 }

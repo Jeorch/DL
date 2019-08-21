@@ -39,7 +39,7 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 					response = []byte("Query Error: " + err.Error())
 				} else {
 					if formatResult, err := model.FormatResult(readResult); err != nil {
-						bmlog.StandardLogger().Error("Query Error: " + err.Error())
+						bmlog.StandardLogger().Error("Format Error: " + err.Error())
 						response = []byte("Format Error: " + err.Error())
 					} else {
 						response, err = json.Marshal(formatResult)
