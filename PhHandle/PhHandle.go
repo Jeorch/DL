@@ -4,23 +4,23 @@ import (
 	"encoding/json"
 	"github.com/PharbersDeveloper/DL/PhModel"
 	"github.com/PharbersDeveloper/DL/PhProxy"
-	"github.com/alfredyang1986/blackmirror/bmlog"
-	"log"
+	"github.com/PharbersDeveloper/bp-go-lib/log"
 	"net/http"
 	"strings"
 )
 
 func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Request)) {
+	bpLog := log.NewLogicLoggerBuilder().Build()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		var response []byte
 		var model PhModel.PhModel
 
 		if err := extractModel(r, &model); err != nil || model.IsEmpty() {
-			bmlog.StandardLogger().Error("Error of the model : " + r.URL.RawQuery)
+			bpLog.Error("Error of the model : " + r.URL.RawQuery)
 			response = []byte("Error of the model : " + r.URL.RawQuery)
 		} else {
-			//bmlog.StandardLogger().Infof("%s : %#v", r.Method, model)
-			log.Printf("%s : %#v", r.Method, model)
+			bpLog.Infof("%s : %#v", r.Method, model)
 
 			switch r.Method {
 			case "PUT":
@@ -30,16 +30,15 @@ func PhHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http.Re
 			case "POST":
 				response = []byte("Not Supported")
 			case "GET":
-				//bmlog.StandardLogger().Infof("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
-				log.Printf("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
+				bpLog.Info("开始查询 table='%s', cond='%#v'", model.Model, model.Query)
 
 				tables := strings.Split(model.Model, ",")
 				if readResult, err := proxy.Read(tables, model.Query); err != nil {
-					bmlog.StandardLogger().Error("Query Error: " + err.Error())
+					bpLog.Error("Query Error: " + err.Error())
 					response = []byte("Query Error: " + err.Error())
 				} else {
 					if formatResult, err := model.FormatResult(readResult); err != nil {
-						bmlog.StandardLogger().Error("Format Error: " + err.Error())
+						bpLog.Error("Format Error: " + err.Error())
 						response = []byte("Format Error: " + err.Error())
 					} else {
 						response, err = json.Marshal(formatResult)

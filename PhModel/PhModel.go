@@ -18,8 +18,7 @@ package PhModel
 
 import (
 	"github.com/PharbersDeveloper/DL/PhFactory"
-	"github.com/alfredyang1986/blackmirror/bmlog"
-	"log"
+	"github.com/PharbersDeveloper/bp-go-lib/log"
 	"reflect"
 )
 
@@ -38,10 +37,11 @@ func (m PhModel) IsEmpty() bool {
 }
 
 func (m PhModel) FormatResult(data interface{}) (result interface{}, err error) {
+	bpLog := log.NewLogicLoggerBuilder().Build()
+
 	result = data
 	for _, plugin := range m.Format {
-		//bmlog.StandardLogger().Infof("开始格式化 class='%s', args='%#v'", plugin["class"].(string), plugin["args"])
-		log.Printf("开始格式化 class='%s', args='%#v'", plugin["class"].(string), plugin["args"])
+		bpLog.Infof("开始格式化 class='%s', args='%#v'", plugin["class"].(string), plugin["args"])
 
 		if class := table.GetFormat(plugin["class"].(string)); class != nil {
 			result, err = class.Exec(plugin["args"])(result)
@@ -49,8 +49,7 @@ func (m PhModel) FormatResult(data interface{}) (result interface{}, err error) 
 				return
 			}
 		} else {
-			bmlog.StandardLogger().Warn("不存在Format：" + plugin["class"].(string))
-			log.Println("不存在Format：" + plugin["class"].(string))
+			bpLog.Warn("不存在Format：" + plugin["class"].(string))
 		}
 	}
 	return

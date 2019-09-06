@@ -26,11 +26,12 @@ replace (
 )
 
 require (
+	github.com/PharbersDeveloper/bp-go-lib v0.0.2
 	github.com/alfredyang1986/blackmirror v0.0.12
 	github.com/hashicorp/go-uuid v1.0.1 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/olivere/elastic/v7 v7.0.5
 	github.com/recursionpharma/go-csv-map v0.0.0-20160524001940-792523c65ae9
-	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20190731233626-505e41936337
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce // indirect
 )

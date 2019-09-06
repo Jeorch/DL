@@ -20,9 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/alfredyang1986/blackmirror/bmlog"
+	"github.com/PharbersDeveloper/bp-go-lib/log"
 	"github.com/olivere/elastic/v7"
-	"log"
+	golog "log"
 	"os"
 	"reflect"
 	"strings"
@@ -53,9 +53,11 @@ func (proxy ESProxy) NewProxy(args map[string]string) *ESProxy {
 }
 
 func (proxy ESProxy) connectES() *ESProxy {
+	bpLog := log.NewLogicLoggerBuilder().Build()
+
 	var host = proxy.protocol + "://" + proxy.host + ":" + proxy.port
 
-	errorlog := log.New(os.Stdout, "ES: ", log.LstdFlags)
+	errorlog := golog.New(os.Stdout, "ES: ", golog.LstdFlags)
 	client, err := elastic.NewClient(elastic.SetSniff(false), elastic.SetErrorLog(errorlog), elastic.SetURL(host))
 	if err != nil {
 		panic(err)
@@ -65,23 +67,22 @@ func (proxy ESProxy) connectES() *ESProxy {
 	if err != nil {
 		panic(err)
 	}
-	bmlog.StandardLogger().Infof("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
-	log.Printf("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
+	bpLog.Infof("Elasticsearch returned with code %d and version %s\n", code, info.Version.Number)
 
 	esversion, err := client.ElasticsearchVersion(host)
 	if err != nil {
 		panic(err)
 	}
-	bmlog.StandardLogger().Infof("Elasticsearch version %s\n", esversion)
-	bmlog.StandardLogger().Info("ES Connect To: " + host)
-	log.Printf("Elasticsearch version %s\n", esversion)
-	log.Println("ES Connect To: " + host)
+	bpLog.Infof("Elasticsearch version %s\n", esversion)
+	bpLog.Info("ES Connect To: " + host)
 
 	proxy.esClient = client
 	return &proxy
 }
 
 func (proxy ESProxy) Create(table string, insert []map[string]interface{}) (result []map[string]interface{}, err error) {
+	bpLog := log.NewLogicLoggerBuilder().Build()
+
 	bulkRequest := proxy.esClient.Bulk()
 	for _, item := range insert {
 		req := elastic.NewBulkIndexRequest().Index(table).Doc(item)
@@ -90,7 +91,7 @@ func (proxy ESProxy) Create(table string, insert []map[string]interface{}) (resu
 	bulkResponse, err := bulkRequest.Do(context.Background())
 
 	if err != nil {
-		log.Printf("ES插入错误" + err.Error())
+		bpLog.Info("ES插入错误" + err.Error())
 		return nil, err
 	}
 	if bulkResponse.Errors {
@@ -169,8 +170,7 @@ func (util esCondUtil) genBaseQuery(oper []interface{}) elastic.Query {
 	case "lte":
 		query = elastic.NewRangeQuery(oper[1].(string)).Lte(oper[2])
 	default:
-		bmlog.StandardLogger().Warn("不支持的查询函数" + oper[0].(string))
-		log.Println("不支持的查询函数" + oper[0].(string))
+		log.NewLogicLoggerBuilder().Build().Warn("不支持的查询函数: " + oper[0].(string))
 	}
 	return query
 }
@@ -198,8 +198,7 @@ func (util esCondUtil) genBoolQuery(oper string, subOpers interface{}) elastic.Q
 	case "and":
 		query.Must(queries...)
 	default:
-		bmlog.StandardLogger().Warn("不支持的查询函数" + oper)
-		log.Println("不支持的查询函数" + oper)
+		log.NewLogicLoggerBuilder().Build().Warn("不支持的查询函数: " + oper)
 	}
 
 	return query
@@ -247,8 +246,7 @@ func (util esCondUtil) genBaseAgg(oper, field string) (string, elastic.Aggregati
 	case "sum":
 		agg = elastic.NewSumAggregation().Field(field)
 	default:
-		bmlog.StandardLogger().Warn("不支持的聚合函数" + oper)
-		log.Println("不支持的聚合函数" + oper)
+		log.NewLogicLoggerBuilder().Build().Warn("不支持的聚合函数: " + oper)
 	}
 	return oper + "(" + field + ")", agg
 }

@@ -19,22 +19,27 @@ package main
 import (
 	"github.com/PharbersDeveloper/DL/PhHandle"
 	"github.com/PharbersDeveloper/DL/PhProxy"
-	"github.com/alfredyang1986/blackmirror/bmlog"
-	"log"
+	"github.com/PharbersDeveloper/bp-go-lib/log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 )
 
+var projName = "data-lake"
 var ip = ""
 var port = "9202"
 var WriteTimeout = time.Second * 4
 var ESHost = "127.0.0.1"
 var ESPort = "9200"
-var LogPath = "dl.log"
 
 func main() {
+	_ = os.Setenv("BP_LOG_TIME_FORMAT", "2006-01-02 15:04:05")
+	bpLog := log.NewLogicLoggerBuilder().Build()
+
+	if ok := os.Getenv("PROJECT_NAME"); ok == "" {
+		_ = os.Setenv("PROJECT_NAME", projName)
+	}
 	if ok := os.Getenv("DL_PORT"); ok != "" {
 		port = ok
 	}
@@ -43,9 +48,6 @@ func main() {
 	}
 	if ok := os.Getenv("ES_PORT"); ok != "" {
 		ESPort = ok
-	}
-	if ok := os.Getenv("LOG_PATH"); ok == "" {
-		_ = os.Setenv("LOG_PATH", LogPath)
 	}
 
 	addr := ip + ":" + port
@@ -71,15 +73,13 @@ func main() {
 		Handler:      mux,
 	}
 
-	bmlog.StandardLogger().Info("Starting httpserver in " + port)
-	log.Println("Starting httpserver in " + port)
+	bpLog.Info("Starting httpserver in " + port)
 
 	go func() {
 		// 接收退出信号
 		<-quit
 		if err := server.Close(); err != nil {
-			bmlog.StandardLogger().Error("Close server:", err)
-			log.Fatal("Close server:", err)
+			bpLog.Error("Close server:", err)
 		}
 	}()
 
@@ -87,13 +87,10 @@ func main() {
 	if err != nil {
 		// 正常退出
 		if err == http.ErrServerClosed {
-			bmlog.StandardLogger().Error("Server closed under request")
-			log.Fatal("Server closed under request")
+			bpLog.Error("Server closed under request")
 		} else {
-			bmlog.StandardLogger().Error("Server closed unexpected", err)
-			log.Fatal("Server closed unexpected", err)
+			bpLog.Error("Server closed unexpected", err)
 		}
 	}
-	bmlog.StandardLogger().Error("Server exited")
-	log.Fatal("Server exited")
+	bpLog.Error("Server exited")
 }
