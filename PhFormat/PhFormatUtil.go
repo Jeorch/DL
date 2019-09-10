@@ -18,8 +18,8 @@
 package PhFormat
 
 import (
+	"errors"
 	"fmt"
-	"log"
 )
 
 func any2float64(any interface{}) float64 {
@@ -54,28 +54,27 @@ func sliceReverse(slice []interface{}) {
 	return
 }
 
-func sliceBubbleSort(slice []interface{}) {
-	compare := func(prev, next interface{}) bool {
-		switch t := prev.(type) {
-		case int:
-			return t > next.(int)
-		case int64:
-			return t > next.(int64)
-		case float32:
-			return t > next.(float32)
-		case float64:
-			return t > next.(float64)
-		case string:
-			return t > next.(string)
-		default:
-			log.Fatal(fmt.Sprintf("%#v, %#v not support compare", prev, next))
-			return true
-		}
+func compare(prev, next interface{}) (bool, error) {
+	switch t := prev.(type) {
+	case int:
+		return t > next.(int), nil
+	case int64:
+		return t > next.(int64), nil
+	case float32:
+		return t > next.(float32), nil
+	case float64:
+		return t > next.(float64), nil
+	case string:
+		return t > next.(string), nil
+	default:
+		return true, errors.New(fmt.Sprintf("%#v, %#v not support compare", prev, next))
 	}
+}
 
+func sliceBubbleSort(slice []interface{}) {
 	for i := 0; i < len(slice); i++ {
 		for j := 1; j < len(slice)-i; j++ {
-			if compare(slice[j-1], slice[j]) {
+			if b, _ := compare(slice[j-1], slice[j]); b {
 				slice[j], slice[j-1] = slice[j-1], slice[j]
 			}
 		}
