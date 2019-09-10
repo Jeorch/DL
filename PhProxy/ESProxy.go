@@ -159,8 +159,7 @@ func (util esCondUtil) genBaseQuery(oper []interface{}) elastic.Query {
 	case "eq":
 		query = elastic.NewMatchQuery(oper[1].(string), oper[2])
 	case "neq":
-		query := elastic.NewBoolQuery()
-		query.MustNot(elastic.NewMatchQuery(oper[1].(string), oper[2]))
+		query = elastic.NewBoolQuery().MustNot(elastic.NewMatchQuery(oper[1].(string), oper[2]))
 	case "gt":
 		query = elastic.NewRangeQuery(oper[1].(string)).Gt(oper[2])
 	case "gte":
