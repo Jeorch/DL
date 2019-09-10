@@ -29,6 +29,7 @@ import (
 var projName = "data-lake"
 var ip = ""
 var port = "9202"
+var version = "v1.0"
 var WriteTimeout = time.Second * 4
 var ESHost = "127.0.0.1"
 var ESPort = "9200"
@@ -42,6 +43,9 @@ func main() {
 	}
 	if ok := os.Getenv("DL_PORT"); ok != "" {
 		port = ok
+	}
+	if ok := os.Getenv("DL_VERSION"); ok != "" {
+		version = ok
 	}
 	if ok := os.Getenv("ES_HOST"); ok != "" {
 		ESHost = ok
@@ -57,7 +61,8 @@ func main() {
 	})
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1.0/DL", PhHandle.PhHandle(proxy))
+	mux.HandleFunc("/"+version+"/DL", PhHandle.PhHandle(proxy))
+	mux.HandleFunc("/"+version+"/NTM/", PhHandle.PhNTMHandle(proxy))
 
 	/// 下面不用管，网上抄的
 	// 主动关闭服务器
