@@ -251,10 +251,14 @@ func (util esCondUtil) genBaseAgg(oper, field string) (string, elastic.Aggregati
 }
 
 func (util esCondUtil) genRecAgg(aggregation map[string]interface{}) (field string, result elastic.Aggregation) {
+	size := 1 << 16
+	if ok := aggregation["size"]; ok != nil {
+		size = int(ok.(float64))
+	}
 	field = aggregation["groupBy"].(string)
 	aggs := aggregation["aggs"].([]interface{})
 
-	terms := elastic.NewTermsAggregation()
+	terms := elastic.NewTermsAggregation().Size(size)
 	if strings.HasPrefix(field, "-") {
 		field = field[1:]
 		terms.Field(field).OrderByKey(false)
