@@ -168,11 +168,43 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 		curTotalSales += info["sales"].(float64)
 	}
 
+	// 根据当前周期医院表的产品字段聚合出患者人数
+	curHospitalResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "product.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"agg":   "sum",
+						"field": "currentPatientNum",
+					},
+				},
+			},
+		},
+	})
+
 	// ( 产品名称，指标贡献率，指标增长率，
 	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
 	var curResult = make([]map[string]interface{}, 0)
 	for _, info := range curInfo {
 		var tmp = make(map[string]interface{}, 0)
+
+		_, currentPatientNumInfo := findSliceByKeys(curHospitalResult, map[string]interface{}{
+			"product.keyword": info["product"],
+		})
+		tmp["current_patient_num"] = currentPatientNumInfo["sum(currentPatientNum)"] //TODO info["current_patient_num"]
+
 
 		tmp["product"] = info["product"]
 
@@ -710,6 +742,32 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 		curTotalSales += info["sum(sales)"].(float64)
 	}
 
+	// 根据当前周期医院表的地区字段聚合出患者人数
+	curHospitalResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "region.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"agg":   "sum",
+						"field": "currentPatientNum",
+					},
+				},
+			},
+		},
+	})
+
 	// ( 代表名称，患者数量，指标贡献率，指标增长率，
 	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
 	var curResult = make([]map[string]interface{}, 0)
@@ -717,7 +775,10 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 		var tmp = make(map[string]interface{}, 0)
 
 		tmp["region"] = info["region.keyword"]
-		tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
+		_, currentPatientNumInfo := findSliceByKeys(curHospitalResult, map[string]interface{}{
+			"region.keyword": info["region.keyword"],
+		})
+		tmp["current_patient_num"] = currentPatientNumInfo["sum(currentPatientNum)"] //TODO info["current_patient_num"]
 
 		tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
 		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
