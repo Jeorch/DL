@@ -178,15 +178,15 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 
 		tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
 		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 1,
+			"product": info["product"],
+			"phase":   info["phase"].(float64) - 1,
 		})
 		tmp["quota_growth"] = calcGrowth(info["quota"], lastPhaseInfo["sales"])
 		tmp["quota_rate"] = calcAchieving(info["sales"], info["quota"])
 
 		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 4,
+			"product": info["product"],
+			"phase":   info["phase"].(float64) - 4,
 		})
 		if lastYearInfo == nil {
 			tmp["year_on_year_sales"] = 0.0
@@ -197,7 +197,7 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 		tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
 
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
-			"product.keyword":  info["product"],
+			"product.keyword": info["product"],
 		})
 		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
 
@@ -216,13 +216,12 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 	return json.Marshal(curResult)
 }
 
-//TODO 未做
 func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
 	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
 
-	// 获得往期区域的全部信息 ( 区域名称，其他 )
+	// 聚合往期代表的销售和 ( 代表名称，sum销售额，sum指标 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
 		"search": map[string]interface{}{
 			"size": 10000.0,
@@ -231,8 +230,27 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Product"},
-				[]interface{}{"neq", "product_type", 1},
+				[]interface{}{"eq", "category.keyword", "Resource"},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "representative.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "phase",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "sales",
+							},
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "quota",
+							},
+						},
+					},
+				},
 			},
 		},
 	})
@@ -242,17 +260,17 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 
 	// 转换为各个周期的销售额透视图
 	phaseSalesPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["product"].(string) },
-		"phase", "sales",
+		func(item map[string]interface{}) string { return item["representative.keyword"].(string) },
+		"phase", "sum(sales)",
 	)
 
 	// 转换为各个周期的销售指标透视图
 	phaseQuotaPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["product"].(string) },
-		"phase", "quota",
+		func(item map[string]interface{}) string { return item["representative.keyword"].(string) },
+		"phase", "sum(quota)",
 	)
 
-	// 取得最新的周期的产品信息
+	// 取得最新的周期的代表信息
 	curInfo, err := findMaxByKey(beforeResult, "phase")
 	if err != nil {
 		return []byte{}, err
@@ -272,14 +290,14 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Product"},
+				[]interface{}{"eq", "category.keyword", "Resource"},
 				[]interface{}{"gte", "phase", minPhase},
 				[]interface{}{"lte", "phase", maxPhase},
 			},
 		},
 		"aggs": []interface{}{
 			map[string]interface{}{
-				"groupBy": "product.keyword",
+				"groupBy": "representative.keyword",
 				"aggs": []interface{}{
 					map[string]interface{}{
 						"agg":   "sum",
@@ -297,48 +315,49 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 	curTotalQuota := 0.0
 	curTotalSales := 0.0
 	for _, info := range curInfo {
-		curTotalQuota += info["quota"].(float64)
-		curTotalSales += info["sales"].(float64)
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
 	}
 
-	// ( 产品名称，指标贡献率，指标增长率，
+	// ( 代表名称，患者数量，指标贡献率，指标增长率，
 	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
 	var curResult = make([]map[string]interface{}, 0)
 	for _, info := range curInfo {
 		var tmp = make(map[string]interface{}, 0)
 
-		tmp["product"] = info["product"]
+		tmp["representative"] = info["representative.keyword"]
+		tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
 
-		tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
+		tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
 		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 1,
+			"representative.keyword": info["representative.keyword"],
+			"phase":                  info["phase"].(float64) - 1,
 		})
-		tmp["quota_growth"] = calcGrowth(info["quota"], lastPhaseInfo["sales"])
-		tmp["quota_rate"] = calcAchieving(info["sales"], info["quota"])
+		tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
+		tmp["quota_rate"] = calcAchieving(info["sum(sales)"], info["sum(quota)"])
 
 		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 4,
+			"representative.keyword": info["representative.keyword"],
+			"phase":                  info["phase"].(float64) - 4,
 		})
 		if lastYearInfo == nil {
 			tmp["year_on_year_sales"] = 0.0
 		} else {
-			tmp["year_on_year_sales"] = calcGrowth(info["sales"], lastYearInfo["sales"])
+			tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"], lastYearInfo["sum(sales)"])
 		}
-		tmp["sales_growth"] = calcGrowth(info["sales"], lastPhaseInfo["sales"])
-		tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
+		tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
+		tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
 
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
-			"product.keyword":  info["product"],
+			"representative.keyword": info["representative.keyword"],
 		})
 		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
 
-		pivotSales := phaseSalesPivot[info["product"].(string)]
+		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotSales {
 			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
-		pivotQuota := phaseQuotaPivot[info["product"].(string)]
+		pivotQuota := phaseQuotaPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotQuota {
 			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
@@ -366,6 +385,36 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 				[]interface{}{"eq", "category.keyword", "Hospital"},
 			},
 		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "hospital.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "phase",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"groupBy": "hospital_level.keyword",
+								"aggs": []interface{}{
+									map[string]interface{}{
+										"groupBy": "product.keyword",
+										"aggs": []interface{}{
+											map[string]interface{}{
+												"agg":   "sum",
+												"field": "sales",
+											},
+											map[string]interface{}{
+												"agg":   "sum",
+												"field": "quota",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	})
 	if err != nil {
 		return []byte{}, err
@@ -373,14 +422,22 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 
 	// 转换为各个周期的销售额透视图
 	phaseSalesPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["hospital"].(string) + "+" + item["product"].(string) },
-		"phase", "sales",
+		func(item map[string]interface{}) string {
+			return item["hospital.keyword"].(string) +
+				"+" + item["hospital_level.keyword"].(string) +
+				"+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(sales)",
 	)
 
 	// 转换为各个周期的销售指标透视图
 	phaseQuotaPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["hospital"].(string) + "+" + item["product"].(string) },
-		"phase", "quota",
+		func(item map[string]interface{}) string {
+			return item["hospital.keyword"].(string) +
+				"+" + item["hospital_level.keyword"].(string) +
+				"+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(quota)",
 	)
 
 	// 取得最新的周期的医院信息
@@ -433,21 +490,45 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	curTotalQuota := 0.0
 	curTotalSales := 0.0
 	for _, info := range curInfo {
-		curTotalQuota += info["quota"].(float64)
-		curTotalSales += info["sales"].(float64)
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
 	}
+
+	// 分出院内和院外两种医院
+	sepHosp := func(data []map[string]interface{}) (internal []map[string]interface{}, outer []map[string]interface{}) {
+		internal = make([]map[string]interface{}, 0)
+		outer = make([]map[string]interface{}, 0)
+		for _, item := range curInfo {
+			if item["hospital_level.keyword"].(string) == "院外" {
+				outer = append(outer, item)
+			} else {
+				internal = append(internal, item)
+			}
+		}
+		return
+	}
+	internal, outer := sepHosp(curInfo)
 
 	// ( 医院名称，产品，代表，患者数量，准入情况，指标贡献率，指标增长率，
 	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
 	var curResult = make([]map[string]interface{}, 0)
-	for _, info := range curInfo {
+	for _, info := range internal {
 		var tmp = make(map[string]interface{}, 0)
+		_, outerInfo := findSliceByKeys(outer, map[string]interface{}{
+			"hospital.keyword": info["hospital.keyword"],
+			"product.keyword":  info["product.keyword"],
+		})
 
 		tmp["hospital"] = info["hospital"]
 		tmp["product"] = info["product"]
 		tmp["representative"] = info["representative"]
-		tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
 		tmp["status"] = info["status"]
+
+		if outerInfo == nil { // 没有对应的外部医院
+			tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
+		} else {
+			tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
+		}
 
 		tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
 		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
@@ -492,13 +573,12 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	return json.Marshal(curResult)
 }
 
-//TODO 未做
 func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
 	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
 
-	// 获得往期区域的全部信息 ( 区域名称，其他 )
+	// 聚合往期区域的销售和 ( 区域名称，sum销售额，sum指标 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
 		"search": map[string]interface{}{
 			"size": 10000.0,
@@ -507,8 +587,27 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Product"},
-				[]interface{}{"neq", "product_type", 1},
+				[]interface{}{"eq", "category.keyword", "Region"},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "region.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "phase",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "sales",
+							},
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "quota",
+							},
+						},
+					},
+				},
 			},
 		},
 	})
@@ -518,17 +617,17 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 
 	// 转换为各个周期的销售额透视图
 	phaseSalesPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["product"].(string) },
-		"phase", "sales",
+		func(item map[string]interface{}) string { return item["region.keyword"].(string) },
+		"phase", "sum(sales)",
 	)
 
 	// 转换为各个周期的销售指标透视图
 	phaseQuotaPivot := genPivot(beforeResult,
-		func(item map[string]interface{}) string { return item["product"].(string) },
-		"phase", "quota",
+		func(item map[string]interface{}) string { return item["region.keyword"].(string) },
+		"phase", "sum(quota)",
 	)
 
-	// 取得最新的周期的产品信息
+	// 取得最新的周期的代表信息
 	curInfo, err := findMaxByKey(beforeResult, "phase")
 	if err != nil {
 		return []byte{}, err
@@ -548,14 +647,14 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Product"},
+				[]interface{}{"eq", "category.keyword", "Region"},
 				[]interface{}{"gte", "phase", minPhase},
 				[]interface{}{"lte", "phase", maxPhase},
 			},
 		},
 		"aggs": []interface{}{
 			map[string]interface{}{
-				"groupBy": "product.keyword",
+				"groupBy": "region.keyword",
 				"aggs": []interface{}{
 					map[string]interface{}{
 						"agg":   "sum",
@@ -573,48 +672,49 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 	curTotalQuota := 0.0
 	curTotalSales := 0.0
 	for _, info := range curInfo {
-		curTotalQuota += info["quota"].(float64)
-		curTotalSales += info["sales"].(float64)
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
 	}
 
-	// ( 产品名称，指标贡献率，指标增长率，
+	// ( 代表名称，患者数量，指标贡献率，指标增长率，
 	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
 	var curResult = make([]map[string]interface{}, 0)
 	for _, info := range curInfo {
 		var tmp = make(map[string]interface{}, 0)
 
-		tmp["product"] = info["product"]
+		tmp["region"] = info["region.keyword"]
+		tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
 
-		tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
+		tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
 		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 1,
+			"region.keyword": info["region.keyword"],
+			"phase":          info["phase"].(float64) - 1,
 		})
-		tmp["quota_growth"] = calcGrowth(info["quota"], lastPhaseInfo["sales"])
-		tmp["quota_rate"] = calcAchieving(info["sales"], info["quota"])
+		tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
+		tmp["quota_rate"] = calcAchieving(info["sum(sales)"], info["sum(quota)"])
 
 		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 4,
+			"region.keyword": info["region.keyword"],
+			"phase":          info["phase"].(float64) - 4,
 		})
 		if lastYearInfo == nil {
 			tmp["year_on_year_sales"] = 0.0
 		} else {
-			tmp["year_on_year_sales"] = calcGrowth(info["sales"], lastYearInfo["sales"])
+			tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"], lastYearInfo["sum(sales)"])
 		}
-		tmp["sales_growth"] = calcGrowth(info["sales"], lastPhaseInfo["sales"])
-		tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
+		tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
+		tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
 
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
-			"product.keyword":  info["product"],
+			"region.keyword": info["region.keyword"],
 		})
 		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
 
-		pivotSales := phaseSalesPivot[info["product"].(string)]
+		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
 		for k, v := range pivotSales {
 			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
-		pivotQuota := phaseQuotaPivot[info["product"].(string)]
+		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string)]
 		for k, v := range pivotQuota {
 			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
