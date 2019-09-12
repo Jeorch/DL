@@ -203,11 +203,15 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 
 		pivotSales := phaseSalesPivot[info["product"].(string)]
 		for k, v := range pivotSales {
-			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 		pivotQuota := phaseQuotaPivot[info["product"].(string)]
 		for k, v := range pivotQuota {
-			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 
 		curResult = append(curResult, tmp)
@@ -355,11 +359,15 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 
 		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotSales {
-			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 		pivotQuota := phaseQuotaPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotQuota {
-			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 
 		curResult = append(curResult, tmp)
@@ -393,20 +401,15 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 						"groupBy": "phase",
 						"aggs": []interface{}{
 							map[string]interface{}{
-								"groupBy": "hospital_level.keyword",
+								"groupBy": "product.keyword",
 								"aggs": []interface{}{
 									map[string]interface{}{
-										"groupBy": "product.keyword",
-										"aggs": []interface{}{
-											map[string]interface{}{
-												"agg":   "sum",
-												"field": "sales",
-											},
-											map[string]interface{}{
-												"agg":   "sum",
-												"field": "quota",
-											},
-										},
+										"agg":   "sum",
+										"field": "sales",
+									},
+									map[string]interface{}{
+										"agg":   "sum",
+										"field": "quota",
 									},
 								},
 							},
@@ -423,9 +426,7 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	// 转换为各个周期的销售额透视图
 	phaseSalesPivot := genPivot(beforeResult,
 		func(item map[string]interface{}) string {
-			return item["hospital.keyword"].(string) +
-				"+" + item["hospital_level.keyword"].(string) +
-				"+" + item["product.keyword"].(string)
+			return item["hospital.keyword"].(string) + "+" + item["product.keyword"].(string)
 		},
 		"phase", "sum(sales)",
 	)
@@ -433,21 +434,32 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	// 转换为各个周期的销售指标透视图
 	phaseQuotaPivot := genPivot(beforeResult,
 		func(item map[string]interface{}) string {
-			return item["hospital.keyword"].(string) +
-				"+" + item["hospital_level.keyword"].(string) +
-				"+" + item["product.keyword"].(string)
+			return item["hospital.keyword"].(string) + "+" + item["product.keyword"].(string)
 		},
 		"phase", "sum(quota)",
 	)
 
 	// 取得最新的周期的医院信息
-	curInfo, err := findMaxByKey(beforeResult, "phase")
+	maxInfo, err := findMaxByKey(beforeResult, "phase")
 	if err != nil {
 		return []byte{}, err
 	}
+	maxPhase := int(maxInfo[0]["phase"].(float64))
+	curInfo, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+	})
 
 	// 计算YTD的销售额
-	maxPhase := int(curInfo[0]["phase"].(float64))
 	minPhase, err := findSameYear(maxPhase, pointOrigin)
 	if err != nil {
 		return []byte{}, err
@@ -490,8 +502,8 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	curTotalQuota := 0.0
 	curTotalSales := 0.0
 	for _, info := range curInfo {
-		curTotalQuota += info["sum(quota)"].(float64)
-		curTotalSales += info["sum(sales)"].(float64)
+		curTotalQuota += info["quota"].(float64)
+		curTotalSales += info["sales"].(float64)
 	}
 
 	// 分出院内和院外两种医院
@@ -499,7 +511,7 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 		internal = make([]map[string]interface{}, 0)
 		outer = make([]map[string]interface{}, 0)
 		for _, item := range curInfo {
-			if item["hospital_level.keyword"].(string) == "院外" {
+			if item["hospital_level"].(string) == "院外" {
 				outer = append(outer, item)
 			} else {
 				internal = append(internal, item)
@@ -515,8 +527,22 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 	for _, info := range internal {
 		var tmp = make(map[string]interface{}, 0)
 		_, outerInfo := findSliceByKeys(outer, map[string]interface{}{
-			"hospital.keyword": info["hospital.keyword"],
-			"product.keyword":  info["product.keyword"],
+			"hospital": info["hospital"],
+			"product":  info["product"],
+		})
+		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"hospital.keyword": info["hospital"],
+			"product.keyword":  info["product"],
+			"phase":            info["phase"].(float64) - 1,
+		})
+		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"hospital.keyword": info["hospital"],
+			"product.keyword":  info["product"],
+			"phase":            info["phase"].(float64) - 4,
+		})
+		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
+			"hospital.keyword": info["hospital"],
+			"product.keyword":  info["product"],
 		})
 
 		tmp["hospital"] = info["hospital"]
@@ -525,46 +551,54 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 		tmp["status"] = info["status"]
 
 		if outerInfo == nil { // 没有对应的外部医院
-			tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
+			tmp["current_patient_num"] = info["currentPatientNum"]
+
+			tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
+			tmp["quota_growth"] = calcGrowth(info["quota"], lastPhaseInfo["sum(sales)"])
+			tmp["quota_rate"] = calcAchieving(info["sales"], info["quota"])
+
+			if lastYearInfo == nil {
+				tmp["year_on_year_sales"] = 0.0
+			} else {
+				tmp["year_on_year_sales"] = calcGrowth(info["sales"], lastYearInfo["sum(sales)"])
+			}
+			tmp["sales_growth"] = calcGrowth(info["sales"], lastPhaseInfo["sum(sales)"])
+			tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+			tmp["inter_sales"] = info["sales"]
+			tmp["outer_sales"] = 0.0
 		} else {
-			tmp["current_patient_num"] = 0 //TODO info["current_patient_num"]
+			tmp["current_patient_num"] = info["currentPatientNum"].(float64) + outerInfo["currentPatientNum"].(float64)
+
+			tmp["quota_contri"] = calcContri(info["quota"].(float64)+outerInfo["quota"].(float64), curTotalQuota)
+			tmp["quota_growth"] = calcGrowth(info["quota"].(float64)+outerInfo["quota"].(float64), lastPhaseInfo["sum(sales)"])
+			tmp["quota_rate"] = calcAchieving(info["sales"].(float64)+outerInfo["sales"].(float64), info["quota"].(float64)+outerInfo["quota"].(float64))
+
+			if lastYearInfo == nil {
+				tmp["year_on_year_sales"] = 0.0
+			} else {
+				tmp["year_on_year_sales"] = calcGrowth(info["sales"].(float64)+outerInfo["sales"].(float64), lastYearInfo["sum(sales)"])
+			}
+			tmp["sales_growth"] = calcGrowth(info["sales"].(float64)+outerInfo["sales"].(float64), lastPhaseInfo["sum(sales)"])
+			tmp["sales_contri"] = calcContri(info["sales"].(float64)+outerInfo["sales"].(float64), curTotalSales)
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+			tmp["inter_sales"] = info["sales"]
+			tmp["outer_sales"] = outerInfo["sales"]
 		}
-
-		tmp["quota_contri"] = calcContri(info["quota"], curTotalQuota)
-		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"hospital": info["hospital"],
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 1,
-		})
-		tmp["quota_growth"] = calcGrowth(info["quota"], lastPhaseInfo["sales"])
-		tmp["quota_rate"] = calcAchieving(info["sales"], info["quota"])
-
-		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
-			"hospital": info["hospital"],
-			"product":  info["product"],
-			"phase":    info["phase"].(float64) - 4,
-		})
-		if lastYearInfo == nil {
-			tmp["year_on_year_sales"] = 0.0
-		} else {
-			tmp["year_on_year_sales"] = calcGrowth(info["sales"], lastYearInfo["sales"])
-		}
-		tmp["sales_growth"] = calcGrowth(info["sales"], lastPhaseInfo["sales"])
-		tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
-
-		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
-			"hospital.keyword": info["hospital"],
-			"product.keyword":  info["product"],
-		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
 
 		pivotSales := phaseSalesPivot[info["hospital"].(string)+"+"+info["product"].(string)]
 		for k, v := range pivotSales {
-			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 		pivotQuota := phaseQuotaPivot[info["hospital"].(string)+"+"+info["product"].(string)]
 		for k, v := range pivotQuota {
-			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 
 		curResult = append(curResult, tmp)
@@ -712,11 +746,15 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 
 		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
 		for k, v := range pivotSales {
-			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string)]
 		for k, v := range pivotQuota {
-			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			if int(k.(float64)) != maxPhase {
+				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+			}
 		}
 
 		curResult = append(curResult, tmp)
