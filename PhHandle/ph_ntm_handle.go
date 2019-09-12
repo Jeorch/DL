@@ -25,6 +25,7 @@ import (
 	"github.com/PharbersDeveloper/DL/PhProxy"
 	"github.com/PharbersDeveloper/bp-go-lib/log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -87,7 +88,16 @@ func PhNTMHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http
 func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
-	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
+	var pointOrigin string // 坐标0处代表的时间
+	if ok := query["point_origin"]; ok != nil {
+		pointOrigin = ok.(string)
+	} else {
+		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
+			pointOrigin = ok
+		} else {
+			pointOrigin = "2019Q1"
+		}
+	}
 
 	// 获得往期产品的全部信息 ( 产品名称，其他 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
@@ -219,7 +229,16 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
-	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
+	var pointOrigin string // 坐标0处代表的时间
+	if ok := query["point_origin"]; ok != nil {
+		pointOrigin = ok.(string)
+	} else {
+		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
+			pointOrigin = ok
+		} else {
+			pointOrigin = "2019Q1"
+		}
+	}
 
 	// 聚合往期代表的销售和 ( 代表名称，sum销售额，sum指标 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
@@ -401,7 +420,16 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
-	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
+	var pointOrigin string // 坐标0处代表的时间
+	if ok := query["point_origin"]; ok != nil {
+		pointOrigin = ok.(string)
+	} else {
+		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
+			pointOrigin = ok
+		} else {
+			pointOrigin = "2019Q1"
+		}
+	}
 
 	// 获得往期全部信息 ( 医院名称，产品，代表，其他 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
@@ -628,7 +656,16 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
 	proposalId := query["proposal_id"].(string)
 	projectId := query["project_id"].(string)
-	pointOrigin := query["point_origin"].(string) // 坐标0处代表的时间
+	var pointOrigin string // 坐标0处代表的时间
+	if ok := query["point_origin"]; ok != nil {
+		pointOrigin = ok.(string)
+	} else {
+		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
+			pointOrigin = ok
+		} else {
+			pointOrigin = "2019Q1"
+		}
+	}
 
 	// 聚合往期区域的销售和 ( 区域名称，sum销售额，sum指标 )
 	beforeResult, err := proxy.Read(tables, map[string]interface{}{
