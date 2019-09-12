@@ -203,15 +203,11 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 
 		pivotSales := phaseSalesPivot[info["product"].(string)]
 		for k, v := range pivotSales {
-			if int(k.(float64)) != maxPhase {
-				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 		pivotQuota := phaseQuotaPivot[info["product"].(string)]
 		for k, v := range pivotQuota {
-			if int(k.(float64)) != maxPhase {
-				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 
 		curResult = append(curResult, tmp)
@@ -389,15 +385,11 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 
 		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotSales {
-			if int(k.(float64)) != maxPhase {
-				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 		pivotQuota := phaseQuotaPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotQuota {
-			if int(k.(float64)) != maxPhase {
-				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 
 		curResult = append(curResult, tmp)
@@ -620,15 +612,11 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 
 		pivotSales := phaseSalesPivot[info["hospital"].(string)+"+"+info["product"].(string)]
 		for k, v := range pivotSales {
-			if int(k.(float64)) != maxPhase {
-				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 		pivotQuota := phaseQuotaPivot[info["hospital"].(string)+"+"+info["product"].(string)]
 		for k, v := range pivotQuota {
-			if int(k.(float64)) != maxPhase {
-				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 
 		curResult = append(curResult, tmp)
@@ -805,15 +793,11 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 
 		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
 		for k, v := range pivotSales {
-			if int(k.(float64)) != maxPhase {
-				tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string)]
 		for k, v := range pivotQuota {
-			if int(k.(float64)) != maxPhase {
-				tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
-			}
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
 
 		curResult = append(curResult, tmp)
