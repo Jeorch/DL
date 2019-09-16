@@ -59,12 +59,21 @@ func PhNTMHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http
 				case "rep_ref":
 					bpLog.Infof("开始查询代表信息表格")
 					response, err = repRef(tables, model.Query, proxy)
+				case "rep_prod":
+					bpLog.Infof("开始查询代表下产品信息表格")
+					response, err = repProd(tables, model.Query, proxy)
 				case "hospital_ref":
 					bpLog.Infof("开始查询医院信息表格")
 					response, err = hospitalRef(tables, model.Query, proxy)
+				case "hospital_prod":
+					bpLog.Infof("开始查询医院下产品信息表格")
+					response, err = hospitalProd(tables, model.Query, proxy)
 				case "region_ref":
 					bpLog.Infof("开始查询区域信息表格")
 					response, err = regionRef(tables, model.Query, proxy)
+				case "region_prod":
+					bpLog.Infof("开始查询区域下产品信息表格")
+					response, err = regionProd(tables, model.Query, proxy)
 				default:
 					response = []byte("Bad Request URL")
 				}
@@ -86,17 +95,9 @@ func PhNTMHandle(proxy PhProxy.PhProxy) (handler func(http.ResponseWriter, *http
 }
 
 func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
-	proposalId := query["proposal_id"].(string)
-	projectId := query["project_id"].(string)
-	var pointOrigin string // 坐标0处代表的时间
-	if ok := query["point_origin"]; ok != nil {
-		pointOrigin = ok.(string)
-	} else {
-		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
-			pointOrigin = ok
-		} else {
-			pointOrigin = "2019Q1"
-		}
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
 	}
 
 	// 获得往期产品的全部信息 ( 产品名称，其他 )
@@ -227,17 +228,9 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 }
 
 func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
-	proposalId := query["proposal_id"].(string)
-	projectId := query["project_id"].(string)
-	var pointOrigin string // 坐标0处代表的时间
-	if ok := query["point_origin"]; ok != nil {
-		pointOrigin = ok.(string)
-	} else {
-		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
-			pointOrigin = ok
-		} else {
-			pointOrigin = "2019Q1"
-		}
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
 	}
 
 	// 聚合往期代表的销售和 ( 代表名称，sum销售额，sum指标 )
@@ -417,18 +410,485 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 	return json.Marshal(curResult)
 }
 
-func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
-	proposalId := query["proposal_id"].(string)
-	projectId := query["project_id"].(string)
-	var pointOrigin string // 坐标0处代表的时间
-	if ok := query["point_origin"]; ok != nil {
-		pointOrigin = ok.(string)
-	} else {
-		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
-			pointOrigin = ok
+func repProd(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 聚合往期代表下产品的销售和 ( 代表名称，sum销售额，sum指标 )
+	beforeResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Resource"},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "representative.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"groupBy": "phase",
+								"aggs": []interface{}{
+									map[string]interface{}{
+										"agg":   "sum",
+										"field": "sales",
+									},
+									map[string]interface{}{
+										"agg":   "sum",
+										"field": "quota",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 转换为各个周期的销售额透视图
+	phaseSalesPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string {
+			return item["representative.keyword"].(string) + "+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(sales)",
+	)
+
+	// 转换为各个周期的销售指标透视图
+	phaseQuotaPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string {
+			return item["representative.keyword"].(string) + "+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(quota)",
+	)
+
+	// 取得最新的周期的代表信息
+	curInfo, err := findMaxByKey(beforeResult, "phase")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算YTD的销售额
+	maxPhase := int(curInfo[0]["phase"].(float64))
+	minPhase, err := findSameYear(maxPhase, pointOrigin)
+	if err != nil {
+		return []byte{}, err
+	}
+	ytdResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Resource"},
+				[]interface{}{"gte", "phase", minPhase},
+				[]interface{}{"lte", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "representative.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "sales",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算最新的周期指标和销售的总和
+	curTotalQuota := 0.0
+	curTotalSales := 0.0
+	for _, info := range curInfo {
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
+	}
+
+	// 根据当前周期医院表的产品字段聚合出患者人数
+	curHospitalResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "representative.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "currentPatientNum",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	// ( 代表名称，患者数量，指标贡献率，指标增长率，
+	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
+	var curResult = make([]map[string]interface{}, 0)
+	for _, info := range curInfo {
+		var tmp = make(map[string]interface{}, 0)
+
+		tmp["representative"] = info["representative.keyword"]
+		tmp["product"] = info["product.keyword"]
+
+		_, currentPatientNumInfo := findSliceByKeys(curHospitalResult, map[string]interface{}{
+			"representative.keyword": info["representative.keyword"],
+			"product.keyword":        info["product.keyword"],
+		})
+		tmp["current_patient_num"] = currentPatientNumInfo["sum(currentPatientNum)"]
+
+		tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
+		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"representative.keyword": info["representative.keyword"],
+			"product.keyword":        info["product.keyword"],
+			"phase":                  info["phase"].(float64) - 1,
+		})
+		tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
+		tmp["quota_rate"] = calcAchieving(info["sum(sales)"], info["sum(quota)"])
+
+		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"representative.keyword": info["representative.keyword"],
+			"product.keyword":        info["product.keyword"],
+			"phase":                  info["phase"].(float64) - 4,
+		})
+		if lastYearInfo == nil {
+			tmp["year_on_year_sales"] = 0.0
 		} else {
-			pointOrigin = "2019Q1"
+			tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"], lastYearInfo["sum(sales)"])
 		}
+		tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
+		tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
+
+		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
+			"representative.keyword": info["representative.keyword"],
+			"product.keyword":        info["product.keyword"],
+		})
+		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)+"+"+info["product.keyword"].(string)]
+		for k, v := range pivotSales {
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+		pivotQuota := phaseQuotaPivot[info["representative.keyword"].(string)+"+"+info["product.keyword"].(string)]
+		for k, v := range pivotQuota {
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+
+		curResult = append(curResult, tmp)
+	}
+
+	return json.Marshal(curResult)
+}
+
+func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获得往期全部信息 ( 医院名称，产品，代表，其他 )
+	beforeResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "phase",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "hospital.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "sales",
+							},
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "quota",
+							},
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "currentPatientNum",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 转换为各个周期的销售额透视图
+	phaseSalesPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string { return item["hospital.keyword"].(string) },
+		"phase", "sum(sales)",
+	)
+
+	// 转换为各个周期的销售指标透视图
+	phaseQuotaPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string { return item["hospital.keyword"].(string) },
+		"phase", "sum(quota)",
+	)
+
+	// 取得最新的周期的医院信息
+	maxInfo, err := findMaxByKey(beforeResult, "phase")
+	if err != nil {
+		return []byte{}, err
+	}
+	maxPhase := int(maxInfo[0]["phase"].(float64))
+	curInfo, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "phase",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "hospital.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"groupBy": "hospital_level.keyword",
+								"aggs": []interface{}{
+									map[string]interface{}{
+										"groupBy": "representative.keyword",
+										"aggs": []interface{}{
+											map[string]interface{}{
+												"groupBy": "status.keyword",
+												"aggs": []interface{}{
+													map[string]interface{}{
+														"agg":   "sum",
+														"field": "sales",
+													},
+													map[string]interface{}{
+														"agg":   "sum",
+														"field": "quota",
+													},
+													map[string]interface{}{
+														"agg":   "sum",
+														"field": "currentPatientNum",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算YTD的销售额
+	minPhase, err := findSameYear(maxPhase, pointOrigin)
+	if err != nil {
+		return []byte{}, err
+	}
+	ytdResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"gte", "phase", minPhase},
+				[]interface{}{"lte", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "hospital.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"agg":   "sum",
+						"field": "sales",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算最新的周期指标和销售的总和
+	curTotalQuota := 0.0
+	curTotalSales := 0.0
+	for _, info := range curInfo {
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
+	}
+
+	// 分出院内和院外两种医院
+	sepHosp := func(data []map[string]interface{}) (internal []map[string]interface{}, outer []map[string]interface{}) {
+		internal = make([]map[string]interface{}, 0)
+		outer = make([]map[string]interface{}, 0)
+		for _, item := range curInfo {
+			if item["hospital_level.keyword"].(string) == "院外" {
+				outer = append(outer, item)
+			} else {
+				internal = append(internal, item)
+			}
+		}
+		return
+	}
+	internal, outer := sepHosp(curInfo)
+
+	// ( 医院名称，产品，代表，患者数量，准入情况，指标贡献率，指标增长率，
+	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
+	var curResult = make([]map[string]interface{}, 0)
+	for _, info := range internal {
+		var tmp = make(map[string]interface{}, 0)
+		_, outerInfo := findSliceByKeys(outer, map[string]interface{}{
+			"hospital.keyword": info["hospital.keyword"],
+		})
+
+		tmp["hospital"] = info["hospital.keyword"]
+		tmp["representative"] = info["representative.keyword"]
+		tmp["status"] = info["status.keyword"]
+
+		if outerInfo == nil { // 没有对应的外部医院
+			_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+				"phase":            info["phase"].(float64) - 1,
+			})
+			_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+				"phase":            info["phase"].(float64) - 4,
+			})
+			_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+			})
+
+			tmp["current_patient_num"] = info["sum(currentPatientNum)"]
+
+			tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
+			tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
+			tmp["quota_rate"] = calcAchieving(info["sum(sales)"], info["sum(quota)"])
+
+			if lastYearInfo == nil {
+				tmp["year_on_year_sales"] = 0.0
+			} else {
+				tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"], lastYearInfo["sum(sales)"])
+			}
+			tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
+			tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+			tmp["inter_sales"] = info["sum(sales)"]
+			tmp["outer_sales"] = 0.0
+		} else {
+			_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+				"phase":            info["phase"].(float64) - 1,
+			})
+			_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+				"phase":            info["phase"].(float64) - 4,
+			})
+			_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
+				"hospital.keyword": info["hospital.keyword"],
+			})
+
+			tmp["current_patient_num"] = info["sum(currentPatientNum)"].(float64) + outerInfo["sum(currentPatientNum)"].(float64)
+
+			tmp["quota_contri"] = calcContri(info["sum(quota)"].(float64)+outerInfo["sum(quota)"].(float64), curTotalQuota)
+			tmp["quota_growth"] = calcGrowth(info["sum(quota)"].(float64)+outerInfo["sum(quota)"].(float64), lastPhaseInfo["sum(sales)"])
+			tmp["quota_rate"] = calcAchieving(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), info["sum(quota)"].(float64)+outerInfo["sum(quota)"].(float64))
+
+			if lastYearInfo == nil {
+				tmp["year_on_year_sales"] = 0.0
+			} else {
+				tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), lastYearInfo["sum(sales)"])
+			}
+			tmp["sales_growth"] = calcGrowth(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), lastPhaseInfo["sum(sales)"])
+			tmp["sales_contri"] = calcContri(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), curTotalSales)
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+			tmp["inter_sales"] = info["sum(sales)"]
+			tmp["outer_sales"] = outerInfo["sum(sales)"]
+		}
+
+		pivotSales := phaseSalesPivot[info["hospital.keyword"].(string)]
+		for k, v := range pivotSales {
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+		pivotQuota := phaseQuotaPivot[info["hospital.keyword"].(string)]
+		for k, v := range pivotQuota {
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+
+		curResult = append(curResult, tmp)
+	}
+
+	return json.Marshal(curResult)
+}
+
+func hospitalProd(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
 	}
 
 	// 获得往期全部信息 ( 医院名称，产品，代表，其他 )
@@ -654,17 +1114,9 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 }
 
 func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
-	proposalId := query["proposal_id"].(string)
-	projectId := query["project_id"].(string)
-	var pointOrigin string // 坐标0处代表的时间
-	if ok := query["point_origin"]; ok != nil {
-		pointOrigin = ok.(string)
-	} else {
-		if ok := os.Getenv("POINT_ORIGIN"); ok != "" {
-			pointOrigin = ok
-		} else {
-			pointOrigin = "2019Q1"
-		}
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
 	}
 
 	// 聚合往期区域的销售和 ( 区域名称，sum销售额，sum指标 )
@@ -843,6 +1295,239 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 	return json.Marshal(curResult)
 }
 
+func regionProd(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy) ([]byte, error) {
+	proposalId, projectId, pointOrigin, err := parseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 聚合往期区域的销售和 ( 区域名称，sum销售额，sum指标 )
+	beforeResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Region"},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "region.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"groupBy": "phase",
+								"aggs": []interface{}{
+									map[string]interface{}{
+										"agg":   "sum",
+										"field": "sales",
+									},
+									map[string]interface{}{
+										"agg":   "sum",
+										"field": "quota",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 转换为各个周期的销售额透视图
+	phaseSalesPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string {
+			return item["region.keyword"].(string) + "+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(sales)",
+	)
+
+	// 转换为各个周期的销售指标透视图
+	phaseQuotaPivot := genPivot(beforeResult,
+		func(item map[string]interface{}) string {
+			return item["region.keyword"].(string) + "+" + item["product.keyword"].(string)
+		},
+		"phase", "sum(quota)",
+	)
+
+	// 取得最新的周期的代表信息
+	curInfo, err := findMaxByKey(beforeResult, "phase")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算YTD的销售额
+	maxPhase := int(curInfo[0]["phase"].(float64))
+	minPhase, err := findSameYear(maxPhase, pointOrigin)
+	if err != nil {
+		return []byte{}, err
+	}
+	ytdResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Region"},
+				[]interface{}{"gte", "phase", minPhase},
+				[]interface{}{"lte", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "region.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "sales",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// 计算最新的周期指标和销售的总和
+	curTotalQuota := 0.0
+	curTotalSales := 0.0
+	for _, info := range curInfo {
+		curTotalQuota += info["sum(quota)"].(float64)
+		curTotalSales += info["sum(sales)"].(float64)
+	}
+
+	// 根据当前周期医院表的代表字段聚合出患者人数
+	curHospitalResult, err := proxy.Read(tables, map[string]interface{}{
+		"search": map[string]interface{}{
+			"size": 10000.0,
+			"and": []interface{}{
+				[]interface{}{"or", []interface{}{
+					[]interface{}{"eq", "proposal_id.keyword", proposalId},
+					[]interface{}{"eq", "project_id.keyword", projectId},
+				}},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
+				[]interface{}{"eq", "phase", maxPhase},
+			},
+		},
+		"aggs": []interface{}{
+			map[string]interface{}{
+				"groupBy": "region.keyword",
+				"aggs": []interface{}{
+					map[string]interface{}{
+						"groupBy": "product.keyword",
+						"aggs": []interface{}{
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "currentPatientNum",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	// ( 代表名称，患者数量，指标贡献率，指标增长率，
+	// 指标达成率，销售额同比增长，销售额环比增长，销售额贡献率，YTD销售额 ) + pivot sales by phase
+	var curResult = make([]map[string]interface{}, 0)
+	for _, info := range curInfo {
+		var tmp = make(map[string]interface{}, 0)
+
+		tmp["region"] = info["region.keyword"]
+		tmp["product"] = info["product.keyword"]
+
+		_, currentPatientNumInfo := findSliceByKeys(curHospitalResult, map[string]interface{}{
+			"region.keyword":  info["region.keyword"],
+			"product.keyword": info["product.keyword"],
+		})
+		tmp["current_patient_num"] = currentPatientNumInfo["sum(currentPatientNum)"]
+
+		tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
+		_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"region.keyword":  info["region.keyword"],
+			"product.keyword": info["product.keyword"],
+			"phase":           info["phase"].(float64) - 1,
+		})
+		tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
+		tmp["quota_rate"] = calcAchieving(info["sum(sales)"], info["sum(quota)"])
+
+		_, lastYearInfo := findSliceByKeys(beforeResult, map[string]interface{}{
+			"region.keyword":  info["region.keyword"],
+			"product.keyword": info["product.keyword"],
+			"phase":           info["phase"].(float64) - 4,
+		})
+		if lastYearInfo == nil {
+			tmp["year_on_year_sales"] = 0.0
+		} else {
+			tmp["year_on_year_sales"] = calcGrowth(info["sum(sales)"], lastYearInfo["sum(sales)"])
+		}
+		tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
+		tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
+
+		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
+			"region.keyword":  info["region.keyword"],
+			"product.keyword": info["product.keyword"],
+		})
+		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+
+		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
+		for k, v := range pivotSales {
+			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string)]
+		for k, v := range pivotQuota {
+			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
+		}
+
+		curResult = append(curResult, tmp)
+	}
+
+	return json.Marshal(curResult)
+}
+
+// 解析查询参数
+func parseQuery(query map[string]interface{}) (proposalId, projectId, pointOrigin string, err error) {
+	if ok := query["proposal_id"]; ok == nil {
+		err = errors.New("Not found `proposal_id` ")
+	} else {
+		proposalId = ok.(string)
+	}
+
+	if ok := query["project_id"]; ok == nil {
+		err = errors.New("Not found `project_id` ")
+	} else {
+		projectId = ok.(string)
+	}
+
+	if ok := query["point_origin"]; ok == nil {
+		if ok := os.Getenv("POINT_ORIGIN"); ok == "" {
+			pointOrigin = "2019Q1"
+		} else {
+			pointOrigin = ok
+		}
+	} else {
+		pointOrigin = ok.(string)
+	}
+	return
+}
+
 // 比较 prev 是否 大于 next
 func compare(prev, next interface{}) (bool, error) {
 	switch t := prev.(type) {
@@ -896,7 +1581,7 @@ func findMaxByKey(data []map[string]interface{}, key string) ([]map[string]inter
 }
 
 // 安全除法
-func safeDivision(divisor, dividend float64) float64 {
+func safeDivision(dividend, divisor float64) float64 {
 	if divisor == 0.0 {
 		if dividend == 0.0 {
 			return 0.0
@@ -988,22 +1673,4 @@ func genPivot(data []map[string]interface{}, pkFunc func(item map[string]interfa
 		}
 	}
 	return phaseSalesPivot
-}
-
-// 通过两重循环过滤重复元素
-func distinctByLoop(slc []int) []int {
-	result := []int{} // 存放结果
-	for i := range slc {
-		flag := true
-		for j := range result {
-			if slc[i] == result[j] {
-				flag = false // 存在重复元素，标识为false
-				break
-			}
-		}
-		if flag { // 标识为false，不添加进结果
-			result = append(result, slc[i])
-		}
-	}
-	return result
 }
