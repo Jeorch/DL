@@ -63,6 +63,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/"+version+"/DL", PhHandle.PhHandle(proxy))
 	mux.HandleFunc("/"+version+"/NTM/", PhHandle.PhNTMHandle(proxy))
+	mux.HandleFunc("/"+version+"/CALC/", PhHandle.PhCalcHandle(proxy))
 
 	/// 下面不用管，网上抄的
 	// 主动关闭服务器
