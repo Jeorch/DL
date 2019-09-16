@@ -86,6 +86,9 @@ func (format AddColFormat) calcResult(expr interface{}, row map[string]interface
 			if err != nil {
 				return nil, err
 			}
+			if right == nil || any2float64(right) == 0 {
+				return 0, nil
+			}
 			result := fmt.Sprintf("%.4f", any2float64(left)/any2float64(right))
 			return result, nil
 		default:
