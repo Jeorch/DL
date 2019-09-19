@@ -708,21 +708,16 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 										"groupBy": "representative.keyword",
 										"aggs": []interface{}{
 											map[string]interface{}{
-												"groupBy": "status.keyword",
-												"aggs": []interface{}{
-													map[string]interface{}{
-														"agg":   "sum",
-														"field": "sales",
-													},
-													map[string]interface{}{
-														"agg":   "sum",
-														"field": "quota",
-													},
-													map[string]interface{}{
-														"agg":   "sum",
-														"field": "currentPatientNum",
-													},
-												},
+												"agg":   "sum",
+												"field": "sales",
+											},
+											map[string]interface{}{
+												"agg":   "sum",
+												"field": "quota",
+											},
+											map[string]interface{}{
+												"agg":   "sum",
+												"field": "currentPatientNum",
 											},
 										},
 									},
@@ -806,7 +801,6 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 
 		tmp["hospital"] = info["hospital.keyword"]
 		tmp["representative"] = info["representative.keyword"]
-		tmp["status"] = info["status.keyword"]
 
 		if outerInfo == nil { // 没有对应的外部医院
 			_, lastPhaseInfo := findSliceByKeys(beforeResult, map[string]interface{}{
