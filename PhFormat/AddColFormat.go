@@ -86,11 +86,16 @@ func (format AddColFormat) calcResult(expr interface{}, row map[string]interface
 			if err != nil {
 				return nil, err
 			}
-			if right == nil || any2float64(right) == 0 {
-				return 0, nil
+
+			if right == nil || any2float64(right) == 0.0 {
+				if left == nil || any2float64(left) == 0.0 {
+					return 0.0, nil
+				} else {
+					return 1.0, nil
+				}
+			} else {
+				return fmt.Sprintf("%.4f", any2float64(left)/any2float64(right)), nil
 			}
-			result := fmt.Sprintf("%.4f", any2float64(left)/any2float64(right))
-			return result, nil
 		default:
 			return nil, errors.New(oper + "不支持的运算符")
 		}
