@@ -19,13 +19,14 @@ package PhFactory
 import "github.com/PharbersDeveloper/DL/PhFormat"
 
 var phFormatFactory = map[string]PhFormat.PhFormat{
-	"filter":     PhFormat.FilterFormat{},
-	"cut2DArray": PhFormat.Cut2DArrayFormat{},
-	"calcRate":   PhFormat.CalcRateFormat{},
-	"calcAvg":    PhFormat.CalcAvgFormat{},
-	"addCol":     PhFormat.AddColFormat{},
-	"addAvgRow":  PhFormat.AddAvgRowFormat{},
-	"pivot":      PhFormat.PivotFormat{},
+	"filter":      PhFormat.FilterFormat{},
+	"cut2DArray":  PhFormat.Cut2DArrayFormat{},
+	"calcRate":    PhFormat.CalcRateFormat{},
+	"calcAvg":     PhFormat.CalcAvgFormat{},
+	"addCol":      PhFormat.AddColFormat{},
+	"addAvgRow":   PhFormat.AddAvgRowFormat{},
+	"addOtherRow": PhFormat.AddOtherRowFormat{},
+	"pivot":       PhFormat.PivotFormat{},
 }
 
 type PhTable struct{}

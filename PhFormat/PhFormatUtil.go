@@ -20,6 +20,7 @@ package PhFormat
 import (
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 func any2float64(any interface{}) float64 {
@@ -32,8 +33,14 @@ func any2float64(any interface{}) float64 {
 		return float64(t)
 	case float64:
 		return t
+	case string:
+		if r, err := strconv.ParseFloat(t, 64); err != nil {
+			return 0.0
+		} else {
+			return r
+		}
 	default:
-		return 0
+		return 0.0
 	}
 }
 
