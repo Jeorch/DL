@@ -61,7 +61,12 @@ func (format AddOtherRowFormat) Exec(args interface{}) func(data interface{}) (r
 
 		all := 0.0
 		if strings.HasPrefix(complete, "$") {
-			all = any2float64(dataMap[0][complete[1:]])
+			for _, item := range dataMap {
+				if val, ok := item[complete[1:]]; ok {
+					all = any2float64(val)
+					break
+				}
+			}
 		} else {
 			all = any2float64(complete)
 		}
