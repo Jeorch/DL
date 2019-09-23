@@ -242,7 +242,7 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Resource"},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
 			},
 		},
 		"aggs": []interface{}{
@@ -425,7 +425,7 @@ func repProd(tables []string, query map[string]interface{}, proxy PhProxy.PhProx
 					[]interface{}{"eq", "proposal_id.keyword", proposalId},
 					[]interface{}{"eq", "project_id.keyword", projectId},
 				}},
-				[]interface{}{"eq", "category.keyword", "Resource"},
+				[]interface{}{"eq", "category.keyword", "Hospital"},
 			},
 		},
 		"aggs": []interface{}{
