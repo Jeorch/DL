@@ -22,28 +22,33 @@ import (
 	"testing"
 )
 
-func TestAddAvgRowFormat_Exec(t *testing.T) {
+func TestAddOtherRowFormat_Exec(t *testing.T) {
 	data := []map[string]interface{}{
 		{
-			"firstname": "A",
-			"lastname": "a",
-			"age": 11,
+			"product": "A",
+			"sales": 11,
+			"potential": 100,
 		},
 		{
-			"firstname": "B",
-			"lastname": "b",
-			"age": 22,
+			"product": "B",
+			"sales": 22,
+			"potential": 100,
 		},
 		{
-			"firstname": "C",
-			"lastname": "c",
-			"age": 33,
+			"product": "C",
+			"sales": 33,
+			"potential": 100,
 		},
 	}
 
-	Convey("增加`平均`行", t, func() {
-		keepTitle := []interface{}{"firstname", "lastname"}
-		result, err := AddAvgRowFormat{}.Exec(keepTitle)(data)
+	Convey("增加`其他`行", t, func() {
+		formula := map[string]interface{}{
+			"fill": "其他",
+			"keep": []interface{}{"potential"},
+			"complete": "$potential",
+			"value": "sales",
+		}
+		result, err := AddOtherRowFormat{}.Exec(formula)(data)
 
 		for _, item := range result.([]map[string]interface{}) {
 			fmt.Println(item)
