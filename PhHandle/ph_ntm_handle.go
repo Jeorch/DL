@@ -1481,11 +1481,11 @@ func regionProd(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 		})
 		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
 
-		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
+		pivotSales := phaseSalesPivot[info["region.keyword"].(string) + "+" + info["product.keyword"].(string)]
 		for k, v := range pivotSales {
 			tmp["sales_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
-		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string)]
+		pivotQuota := phaseQuotaPivot[info["region.keyword"].(string) + "+" + info["product.keyword"].(string)]
 		for k, v := range pivotQuota {
 			tmp["quota_"+fmt.Sprintf("%d", int(k.(float64)))] = v
 		}
