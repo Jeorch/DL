@@ -210,7 +210,11 @@ func productRef(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
 			"product.keyword": info["product"],
 		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		if ytdInfo == nil {
+			tmp["ytd_sales"] = 0.0
+		} else {
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		}
 
 		pivotSales := phaseSalesPivot[info["product"].(string)]
 		for k, v := range pivotSales {
@@ -393,7 +397,11 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
 			"representative.keyword": info["representative.keyword"],
 		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		if ytdInfo == nil {
+			tmp["ytd_sales"] = 0.0
+		} else {
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		}
 
 		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)]
 		for k, v := range pivotSales {
@@ -600,7 +608,11 @@ func repProd(tables []string, query map[string]interface{}, proxy PhProxy.PhProx
 			"representative.keyword": info["representative.keyword"],
 			"product.keyword":        info["product.keyword"],
 		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		if ytdInfo == nil {
+			tmp["ytd_sales"] = 0.0
+		} else {
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		}
 
 		pivotSales := phaseSalesPivot[info["representative.keyword"].(string)+"+"+info["product.keyword"].(string)]
 		for k, v := range pivotSales {
@@ -828,7 +840,11 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 			}
 			tmp["sales_growth"] = calcGrowth(info["sum(sales)"], lastPhaseInfo["sum(sales)"])
 			tmp["sales_contri"] = calcContri(info["sum(sales)"], curTotalSales)
-			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			if ytdInfo == nil {
+				tmp["ytd_sales"] = 0.0
+			} else {
+				tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			}
 
 			tmp["inter_sales"] = info["sum(sales)"]
 			tmp["outer_sales"] = 0.0
@@ -858,7 +874,11 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 			}
 			tmp["sales_growth"] = calcGrowth(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), lastPhaseInfo["sum(sales)"])
 			tmp["sales_contri"] = calcContri(info["sum(sales)"].(float64)+outerInfo["sum(sales)"].(float64), curTotalSales)
-			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			if ytdInfo == nil {
+				tmp["ytd_sales"] = 0.0
+			} else {
+				tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			}
 
 			tmp["inter_sales"] = info["sum(sales)"]
 			tmp["outer_sales"] = outerInfo["sum(sales)"]
@@ -1068,7 +1088,11 @@ func hospitalProd(tables []string, query map[string]interface{}, proxy PhProxy.P
 			}
 			tmp["sales_growth"] = calcGrowth(info["sales"], lastPhaseInfo["sum(sales)"])
 			tmp["sales_contri"] = calcContri(info["sales"], curTotalSales)
-			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			if ytdInfo == nil {
+				tmp["ytd_sales"] = 0.0
+			} else {
+				tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			}
 
 			tmp["inter_sales"] = info["sales"]
 			tmp["outer_sales"] = 0.0
@@ -1086,7 +1110,11 @@ func hospitalProd(tables []string, query map[string]interface{}, proxy PhProxy.P
 			}
 			tmp["sales_growth"] = calcGrowth(info["sales"].(float64)+outerInfo["sales"].(float64), lastPhaseInfo["sum(sales)"])
 			tmp["sales_contri"] = calcContri(info["sales"].(float64)+outerInfo["sales"].(float64), curTotalSales)
-			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			if ytdInfo == nil {
+				tmp["ytd_sales"] = 0.0
+			} else {
+				tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+			}
 
 			tmp["inter_sales"] = info["sales"]
 			tmp["outer_sales"] = outerInfo["sales"]
@@ -1272,7 +1300,11 @@ func regionRef(tables []string, query map[string]interface{}, proxy PhProxy.PhPr
 		_, ytdInfo := findSliceByKeys(ytdResult, map[string]interface{}{
 			"region.keyword": info["region.keyword"],
 		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		if ytdInfo == nil {
+			tmp["ytd_sales"] = 0.0
+		} else {
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		}
 
 		pivotSales := phaseSalesPivot[info["region.keyword"].(string)]
 		for k, v := range pivotSales {
@@ -1479,7 +1511,11 @@ func regionProd(tables []string, query map[string]interface{}, proxy PhProxy.PhP
 			"region.keyword":  info["region.keyword"],
 			"product.keyword": info["product.keyword"],
 		})
-		tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		if ytdInfo == nil {
+			tmp["ytd_sales"] = 0.0
+		} else {
+			tmp["ytd_sales"] = ytdInfo["sum(sales)"]
+		}
 
 		pivotSales := phaseSalesPivot[info["region.keyword"].(string) + "+" + info["product.keyword"].(string)]
 		for k, v := range pivotSales {
