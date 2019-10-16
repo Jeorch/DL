@@ -264,6 +264,10 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 								"agg":   "sum",
 								"field": "quota",
 							},
+							map[string]interface{}{
+								"agg":   "sum",
+								"field": "potential",
+							},
 						},
 					},
 				},
@@ -368,6 +372,7 @@ func repRef(tables []string, query map[string]interface{}, proxy PhProxy.PhProxy
 		var tmp = make(map[string]interface{}, 0)
 
 		tmp["representative"] = info["representative.keyword"]
+		tmp["potential"] = info["sum(potential)"]
 
 		_, currentPatientNumInfo := findSliceByKeys(curHospitalResult, map[string]interface{}{
 			"representative.keyword": info["representative.keyword"],
@@ -731,6 +736,10 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 												"agg":   "sum",
 												"field": "currentPatientNum",
 											},
+											map[string]interface{}{
+												"agg":   "sum",
+												"field": "potential",
+											},
 										},
 									},
 								},
@@ -828,6 +837,7 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 			})
 
 			tmp["current_patient_num"] = info["sum(currentPatientNum)"]
+			tmp["potential"] = info["sum(potential)"]
 
 			tmp["quota_contri"] = calcContri(info["sum(quota)"], curTotalQuota)
 			tmp["quota_growth"] = calcGrowth(info["sum(quota)"], lastPhaseInfo["sum(sales)"])
@@ -862,6 +872,7 @@ func hospitalRef(tables []string, query map[string]interface{}, proxy PhProxy.Ph
 			})
 
 			tmp["current_patient_num"] = info["sum(currentPatientNum)"].(float64) + outerInfo["sum(currentPatientNum)"].(float64)
+			tmp["potential"] = info["sum(potential)"].(float64) + outerInfo["sum(potential)"].(float64)
 
 			tmp["quota_contri"] = calcContri(info["sum(quota)"].(float64)+outerInfo["sum(quota)"].(float64), curTotalQuota)
 			tmp["quota_growth"] = calcGrowth(info["sum(quota)"].(float64)+outerInfo["sum(quota)"].(float64), lastPhaseInfo["sum(sales)"])
